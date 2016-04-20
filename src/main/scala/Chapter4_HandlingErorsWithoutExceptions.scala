@@ -32,4 +32,23 @@ object Chapter4_HandlingErorsWithoutExceptions {
     }
   }
 
+  def variance(xs: Seq[Double]): Option[Double] =  {
+      def findMean: Option[Double] = xs.size match {
+        case 0 => None
+        case x => Some(xs.sum / x)
+      }
+    findMean.flatMap(Math.pow())
+    mean
+  }
+
+  def map2[A,B,C](a: Option[A], b: Option[B])(f: (A, B) => C): Option[C] = a.flatMap(aVal => b.map(f(aVal, _)))
+
+  def sequence[A](a: List[Option[A]]): Option[List[A]] = {
+      def iterateTailRec(aList:  List[Option[A]], returningList: Option[List[A]]): Option[List[A]] = aList match {
+        case h :: t => iterateTailRec(t, returningList.flatMap(list => h.map(_ :: list)))
+        case Nil => returningList.map(_.reverse)
+      }
+    iterateTailRec(a, Some(List[A]()))
+  }
+
 }
