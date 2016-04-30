@@ -1,0 +1,15 @@
+Def. A monoid for a type A is:
+
+• an operation 'combine' with type (A,A)=>A;
+• a unit element of type A, called 'empty'.
+
+The following laws must hold:
+• combine(x, combine(y, z)) == combine(combine(x, y), z) for all x,y, and z, in A;
+• combine(a, empty) == combine(empty, a) == a for any a in A.
+
+Note: Available by importing the library cats.Monoid
+
+
+
+Def. A semigroup is a monoid with no unit element. Hence Monoid < Semigroup
+It is available by importing import cats.Semigroup.

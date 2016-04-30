@@ -1,0 +1,4 @@
+Defini on of a Monad
+Formally, a monad for a type F[A] has:
+• anopera onflatMapwithtype(F[A],A=>F[B])=>F[B]
+• anopera onpurewithtypeA=>F[A].
