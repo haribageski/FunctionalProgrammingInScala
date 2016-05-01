@@ -9,7 +9,7 @@ object FunctorEx extends App{
   // success: [A](value: A)Result[A]
 
 
-  val x = Success(100).map(_ * 2)
+  val x = success(100).map(_ * 2)
 }
 
 sealed trait Result[+A] // defined trait Result
