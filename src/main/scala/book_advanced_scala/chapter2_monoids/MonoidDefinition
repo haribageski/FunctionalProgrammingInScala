@@ -13,3 +13,5 @@ Note: Available by importing the library cats.Monoid
 
 Def. A semigroup is a monoid with no unit element. Hence Monoid < Semigroup
 It is available by importing import cats.Semigroup.
+
+

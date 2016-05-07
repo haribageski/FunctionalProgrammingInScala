@@ -2,7 +2,6 @@ package book_advanced_scala.chapter3_functors
 
 import DefaultFunctors._
 import FunctorSyntax._
-import cats.Functor
 
 object FunctorEx extends App{
   def success[A](value: A): Result[A] = Success(value)

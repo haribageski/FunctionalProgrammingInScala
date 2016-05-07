@@ -1,4 +1,4 @@
-Defini on of a Monad
+Definition of a Monad
 Formally, a monad for a type F[A] has:
-• anopera onflatMapwithtype(F[A],A=>F[B])=>F[B]
-• anopera onpurewithtypeA=>F[A].
+• an opera on flatMap with type (F[A], A => F[B]) => F[B]
+• an opera on pure with type A => F[A].
