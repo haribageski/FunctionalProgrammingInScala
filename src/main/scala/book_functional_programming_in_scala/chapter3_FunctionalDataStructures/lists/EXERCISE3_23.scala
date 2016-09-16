@@ -9,7 +9,7 @@ object EXERCISE3_23 extends App{
     def zipAccumulated(listA: List[A], listB: List[A], listAccumulated: List[A]): List[A] = (listA, listB) match {
       case (Nil, _) => listAccumulated
       case (_, Nil) => listAccumulated
-      case _ => zipAccumulated(listA.tail, listB.tail, f(listA.head, listB.head) :: listAccumulated)   //putting in reverse order intendedly
+      case _ => zipAccumulated(listA.tail, listB.tail, f(listA.head, listB.head) :: listAccumulated)   //putting in reverse order on purpose
     }
     zipAccumulated(reverseList(listA), reverseList(listB), List.empty[A])   //start with reversed lists because the implementation works in reverse order
   }

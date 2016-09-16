@@ -1,6 +1,6 @@
 //package book_functional_programming_in_scala.chapter3_FunctionalDataStructures.trees
 //
-//sealed trait Tree[+A] {
+//sealed trait Tree[A <% Double] {
 //  def getVal: A = this match {
 //    case Leaf(x) => x
 //    case Branch(x, left, right) => x
@@ -13,18 +13,18 @@
 //  }
 //
 //  //EXERCISE3_26
-//  def maxOfTwoElements[B <% Double[B]](x: B, y: B) = {
+//  def maxOfTwoElements[A](x: A, y: A): A = {
 //    if (x < y) y
 //    else x
 //  }
 //
-//  def maxOfThreeElements[B <% Double[B]](x: B, y: B, z: B): B = {
+//  def maxOfThreeElements[A](x: A, y: A, z: A): A = {
 //    maxOfTwoElements(maxOfTwoElements(x, y), z)
 //  }
 //
-//  def max[B <% Ordered[B]](): B = this match {
-//    case Leaf(x: B) => x
-//    case Branch(x: B, left, right) => maxOfThreeElements(x, left.max, right.max)
+//  def max: A = this match {
+//    case Leaf(x) => x
+//    case Branch(x, left, right) => maxOfThreeElements(x, left.max, right.max)
 //  }
 //
 //  //EXERCISE3_28
@@ -34,22 +34,18 @@
 //  }
 //
 //  //EXERCISE3_29
-//  def fold[B](init: B)(f: (B, A) => B, g: (B, B) => B): B = this match {
+//  def foldTree[B](init: B)(f: (B, A) => B, g: (B, B) => B): B = this match {
 //    case Leaf(x: A) => f(init, x)
-//    case Branch(x: A, left: Tree, right: Tree) => g(left.fold(f(init, x))(f, g), right.fold(f(init, x))(f, g))
+//    case Branch(x: A, left, right) => g(left.foldTree(f(init, x))(f, g), right.foldTree(f(init, x))(f, g))
 //  }
-//  def sizeWithFold(): Double = fold(0.0)((acc, tree) => acc + 1, (x, y) => x + y)
+//  def sizeWithFold(): Double = foldTree(0.0)((acc, tree) => acc + 1, (x, y) => x + y)
 //
-//  def widthWithFold(): Double = fold(0.0)((acc, treeVal: A) => acc, (leftMax, rightMax) => Math.max(leftMax, rightMax))
+//  def widthWithFold(): Double = foldTree(0.0)((acc, treeVal) => acc + 1, (leftMax, rightMax) => Math.max(leftMax, rightMax))
 //
-//  def maxWithFold(): A = this match {
-//    case Leaf(x) => x
-//    case Branch(x: A, left, right) => fold(x)(maxOfTwoElements(_, _), maxOfTwoElements(_, _))
+//  def maxWithFold[A](): A = this match {
+//    case Leaf(x: A) => x
+//    case Branch(x: A, left, right) => this.foldTree(x)(maxOfTwoElements(_, _), maxOfTwoElements(_, _))
 //  }
-//
-//
-//  val tree = Branch(3, Branch(2, Leaf(1), Leaf(2)), Leaf(3))
-//  println(tree.size())
 //}
 //
 //case class Leaf[A](value: A) extends Tree[A]
