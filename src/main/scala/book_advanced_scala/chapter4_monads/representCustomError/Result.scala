@@ -7,7 +7,9 @@ trait Result {
   type LoginResult = LoginError Xor User // defined type alias LoginResult
 
   def handleError(error: LoginError): Unit = error match {
-    case UserNotFound(u) => println(s"User not found: $u") case PasswordIncorrect(u) => println(s"Password incorrect: $u") case _ : UnexpectedError => println(s"Unexpected error")
+    case UserNotFound(u) => println(s"User not found: $u")
+    case PasswordIncorrect(u) => println(s"Password incorrect: $u")
+    case _ : UnexpectedError => println(s"Unexpected error")
   }
   // handleError: (error: LoginError)Unit
   val result1: LoginResult = User("dave", "passw0rd").right // result1: LoginResult = Right(User(dave,passw0rd))

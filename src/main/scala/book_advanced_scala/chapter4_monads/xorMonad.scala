@@ -15,7 +15,7 @@ object xorMonad extends App{
 
   println(p)
 
-  val r = 123.right[String]
+  val z = 123.right[String]
   // a: cats.data.Xor[String,Int] = Right(123)
   val t = a.swap
   // b: cats.data.Xor[Int,String] = Left(123)

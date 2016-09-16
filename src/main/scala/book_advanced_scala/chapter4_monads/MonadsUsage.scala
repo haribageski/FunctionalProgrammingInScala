@@ -7,7 +7,7 @@ object MonadsUsage {
   // import cats.std.option._
   import cats.std.list._
   // import cats.std.list._
-  val opt1 = Monad[Option].pure(3) // opt1: Option[Int] = Some(3)
+  val opt1: Option[Int] = Monad[Option].pure(3) // opt1: Option[Int] = Some(3)
   val opt2 = Monad[Option].flatMap(opt1)(a => Some(a + 2)) // opt2: Option[Int] = Some(5)
   val list1 = Monad[List].pure(3) // list1: List[Int] = List(3)
   val list2 = List(1, 2, 3)
