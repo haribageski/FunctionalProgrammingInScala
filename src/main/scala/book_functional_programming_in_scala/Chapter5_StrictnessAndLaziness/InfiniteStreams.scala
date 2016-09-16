@@ -1,4 +1,4 @@
-package book_functional_programming_in_scala.Chapter5_StrictnessAndLaziness
+package book_functional_programming_in_scala.chapter5_StrictnessAndLaziness
 
 import Stream._
 

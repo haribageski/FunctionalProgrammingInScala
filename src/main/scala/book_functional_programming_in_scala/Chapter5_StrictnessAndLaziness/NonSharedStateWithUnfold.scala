@@ -1,6 +1,6 @@
-package book_functional_programming_in_scala.Chapter5_StrictnessAndLaziness
+package book_functional_programming_in_scala.chapter5_StrictnessAndLaziness
 
-import book_functional_programming_in_scala.Chapter5_StrictnessAndLaziness.Stream.cons
+import book_functional_programming_in_scala.chapter5_StrictnessAndLaziness.Stream.cons
 
 object NonSharedStateWithUnfold {
   def unfold[A, S](z: S)(f: S => Option[(A, S)]): Stream[A] = {

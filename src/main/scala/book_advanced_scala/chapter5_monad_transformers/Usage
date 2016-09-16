@@ -1,0 +1,18 @@
+Intuitive understanding:
+    Monad1[A] -> Monad1[ Monad2[ A]]
+Monad transformers allow us to squash together monads, creating one monad where we previously had two
+or more nested. With this transformed monad we can avoid nested calls to flatMap.
+
+Ex. type ListOption[A] = OptionT[List, A] but the result is effecively a List[Option[A]]
+    Our Result type is a monad that combines the properties of List and Option. Note how we build it from the inside out:
+    we pass to OptionT the type of the monad we wrap around it:
+         val result = 42.point[ErrorOptionOr]
+        // result: EitherT[\/[String, Option[Int]]
+
+Ex. type FutureList[A] = ListT[Future, A]
+    type FutureListOption[A] = OptionT[FutureList, A]
+
+Tip
+The general pattern for constructing a monad stack is as follows:
+• build from the inside out;
+• define type aliases with single type parameters for each intermediate layer.

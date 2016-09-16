@@ -1,6 +1,6 @@
-package book_functional_programming_in_scala.Chapter5_StrictnessAndLaziness
+package book_functional_programming_in_scala.chapter5_StrictnessAndLaziness
 
-import book_functional_programming_in_scala.Chapter5_StrictnessAndLaziness.Stream._
+import book_functional_programming_in_scala.chapter5_StrictnessAndLaziness.Stream._
 
 import scala.annotation.tailrec
 import scala.collection.mutable.ListBuffer
