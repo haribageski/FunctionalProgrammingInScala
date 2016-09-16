@@ -1,0 +1,72 @@
+trait Applicative[F[_]] {
+    def point[A](value: A): F[A]
+    def apply2[A, B, C](a: F[A], b: F[B]) (func: (A, B) => C): F[C]
+}
+
+
+Implementation in ScalaZ:
+trait Applicative[F[_]] {
+    def point[A](value: A): F[A]
+    def ap[A, B](a: F[A])(func: F[A => B]): F[B]
+
+    def apply2[A, B, C](a: F[A], b: F[B]) (func: (A, B) => C): F[C] =
+      ap(b)(ap(a)(func.curried))			<<<- missing point(func.curried)
+    def apply2[A, B, C, D](a: F[A], b: F[B], c: F[C]) (func: (A, B, C) => D): F[D] =
+      ap(c)(ap(b)(ap(a)(func.curried)))
+}
+
+formal rules for an applicative:
+• Identity: ap(a)(point(x=>x))==a
+• Homomorphism: ap(point(a))(point(b))==point(b(a))
+• Interchange: ap(point(a))(fb)==ap(fb)(point(x=>x(a)))
+• Map-like:map(fa)(fb)==ap(fa)(point(fb))
+
+
+Where Monads are not sufficient:
+
+1. With parallel jobs - Futures:
+def getTraffic(host: String): Future[Int] =
+???
+// Fetch the total traffic for our three production web servers:
+def totalTraffic: Future[Int] = for {
+a <- getTraffic("host1") b <- getTraffic("host2") c <- getTraffic("host3")
+} yield a + b + c
+// totalTraffic: Future[Int] = ...
+
+//Solution
+def totalTraffic: Future[Int] = Applicative[Future].apply3(
+    getTraffic("host1"),
+    getTraffic("host2"),
+    getTraffic("host3")
+)(_ + _ + _)
+
+
+2. When we need to combine the inner type - Validation:
+    Applicative[ErrorOr].apply2(fail1, fail2)(_ + _)
+    for {
+        a <- fail1
+        b <- fail2
+    } yield a + b
+    // res0: ErrorOr[Int] = -\/(Fail1)
+    //Breaks after the first failier
+
+Solution using combine(a: A, b: A) => F[A]
+    Applicative[ErrorOr].apply2(fail1, fail2)(_ + _)
+    // Calling fail2
+    // Calling fail1
+    // res1: ErrorOr[String] = Failure(List(Fail1, Fail2))
+
+Solution using combine(a: F[A], b: F[A]) => F[A]
+    Applicative[VectorOr].apply2(
+      Vector(404).failure[Int],
+      Vector(500).failure[Int]
+    )(_ * _)
+    // res4: VectorOr[Int] = Failure(Vector(404, 500))
+
+We can convert back and forth between Validation and \/ using the disjuction and validation methods.
+This allows us to switch between fail-fast and error-accumula ng seman cs on the fly:
+    "123".parseInt.disjunction
+    // res8: scalaz.\/[NumberFormatException,Int] = \/-(123)
+    "123".parseInt.disjunction.validation
+    // res9: scalaz.Validation[NumberFormatException,Int] = Success(123)
+We should note that \/ does not accumulate all the errors, while Validation does (because it is not a monad).
