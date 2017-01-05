@@ -6,10 +6,10 @@ import book_functional_programming_in_scala.chapter8_PropertyBasedTesting.Prop._
 trait Parsers[ParserError, Parser[+ _]]{ self =>    //[+ _] is used when the outer type is a type constructor itself
 
   def run[A](p: Parser[A])(input: String): Either[ParserError, A]   //representation
-  def or[A](s1: Parser[A], s2: Parser[A]): Parser[A]  //primitive
+  def or[A](s1: Parser[A], s2: => Parser[A]): Parser[A]  //primitive
   def map[A, B](p: Parser[A])(f: A => B): Parser[B]   //primitive
-  def product[A, B](p1: Parser[A], p2: Parser[B]): Parser[(A, B)]   //primitive
-  def map2[A, B, C](p: Parser[A], p2: Parser[B])(f: ((A, B)) => C): Parser[C] = product(p, p2).map(f)
+  def product[A, B](p1: Parser[A], p2: => Parser[B]): Parser[(A, B)]   //primitive, lazy second argument is necessary, otherwise map2() will never terminate
+  def map2[A, B, C](p: Parser[A], p2: => Parser[B])(f: (A, B) => C): Parser[C] = product(p, p2).map(f.tupled) //lazy second argument is necessary, otherwise many() will never terminate
   def succeed[A](unit: A): Parser[A] = string("").map(_ => unit)
 
   implicit def char(c: Char): Parser[Char] = string(c.toString).map(_.charAt(0))
@@ -19,10 +19,22 @@ trait Parsers[ParserError, Parser[+ _]]{ self =>    //[+ _] is used when the out
   def slice[A](p: Parser[A]): Parser[String]    //primitive
   def listOfN[A](n: Int, p: Parser[A]): Parser[List[A]] = n match {
       case 0 => succeed(Nil)
-      case _ => map2(p, listOfN(n - 1, p))((aAndLisA: (A, List[A])) => aAndLisA._1 :: aAndLisA._2)
+      case _ => map2(p, listOfN(n - 1, p))(_ :: _)
     }
-  def many[A](p: Parser[A]): Parser[List[A]] = map2(p, many(p))(aAndListA => aAndListA._1 :: aAndListA._2) or succeed(Nil)
-  def many1[A](p: Parser[A]): Parser[List[A]] = map2(p, many(p))(aAndListA => aAndListA._1 :: aAndListA._2)
+  def many[A](p: Parser[A]): Parser[List[A]] = {
+    //Slower but no stack overflow:
+    @scala.annotation.tailrec
+    def iterateRecursively(acc: Parser[List[A]]): Parser[List[A]] = {
+      val a = p.map(List(_)) or succeed(Nil)
+      val nextAcc: Parser[List[A]] = map2(a, acc)(_ ::: _)
+      iterateRecursively(nextAcc)
+    }
+    iterateRecursively(succeed(Nil))
+
+    //Faster but danger of stack overflow:
+    //map2(p, many(p))(_ :: _) or succeed(Nil)
+  }
+  def many1[A](p: Parser[A]): Parser[List[A]] = map2(p, many(p))(_ :: _)
   def occurrences(c: Char): Parser[Int] = char(c).slice.map(_.length)
   val numA = occurrences('a')
   def occurrencesAtLeastOne(c: Char): Parser[Int]
@@ -30,7 +42,7 @@ trait Parsers[ParserError, Parser[+ _]]{ self =>    //[+ _] is used when the out
     char('a').many.slice.map(_.size) ** char('b').many1.slice.map(_.size)
 
 
-  
+
   case class ParserOps[A](p: Parser[A]) {
     def |[B >: A](p2: Parser[B]): Parser[B] = self.or(p, p2)
     def or[B >: A](p2: => Parser[B]): Parser[B] = self.or(p, p2)
@@ -72,10 +84,11 @@ trait Parsers[ParserError, Parser[+ _]]{ self =>    //[+ _] is used when the out
     * run(char(c))(c.toString) == Right(c)
     * run(string(s))(s.toString) == Right(s)
     *
+    * Or: it tries p1 on the input, and then tries p2 only if p1 fails
+    * run(or(string("aba"), string("ab"))("abab") == Right("aba")
+    * run(or(string("aba"), string("ab"))("ab") == Right("ab")
     * run(or(string("abra"), string("kadabra"))("abra") == Right("abra")
     * run(or(string("abra"), string("kadabra"))("kadabra") == Right("kadabra")
-    *
-    *
     *
     * run(listOfN(3, "ab" | "cad"))("ababcad") == Rignt("ababcad")
     * run(listOfN(3, "ab" | "cad"))("cadabab") == Rignt("cadabab")
