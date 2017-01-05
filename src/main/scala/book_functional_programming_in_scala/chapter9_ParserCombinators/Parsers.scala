@@ -5,21 +5,20 @@ import book_functional_programming_in_scala.chapter8_PropertyBasedTesting.Prop._
 
 trait Parsers[ParserError, Parser[+ _]]{ self =>    //[+ _] is used when the outer type is a type constructor itself
 
-  def run[A](p: Parser[A])(input: String): Either[ParserError, A]
-  def or[A](s1: Parser[A], s2: Parser[A]): Parser[A]
-  def map[A, B](p: Parser[A])(f: A => B): Parser[B]
-  def product[A, B](p1: Parser[A], p2: Parser[B]): Parser[(A, B)]
+  def run[A](p: Parser[A])(input: String): Either[ParserError, A]   //representation
+  def or[A](s1: Parser[A], s2: Parser[A]): Parser[A]  //primitive
+  def map[A, B](p: Parser[A])(f: A => B): Parser[B]   //primitive
+  def product[A, B](p1: Parser[A], p2: Parser[B]): Parser[(A, B)]   //primitive
   def map2[A, B, C](p: Parser[A], p2: Parser[B])(f: ((A, B)) => C): Parser[C] = product(p, p2).map(f)
-  def flatMap[A, B](p: Parser[A])(f: A => Parser[B]): Parser[B]
   def succeed[A](unit: A): Parser[A] = string("").map(_ => unit)
 
   implicit def char(c: Char): Parser[Char] = string(c.toString).map(_.charAt(0))
-  implicit def string(s: String): Parser[String]
+  implicit def string(s: String): Parser[String]    //primitive
   implicit def operators[A](p: Parser[A]): ParserOps[A] = ParserOps(p)
   implicit def asStringParser[A](a: A)(implicit f: A => Parser[String]): ParserOps[String] = ParserOps(f(a))
-  def slice[A](p: Parser[A]): Parser[String]
-  def listOfN[A](n: Int, p: Parser[A]): Parser[List[A]]
-  def many[A](p: Parser[A]): Parser[List[A]]
+  def slice[A](p: Parser[A]): Parser[String]    //primitive
+  def listOfN[A](n: Int, p: Parser[A]): Parser[List[A]]   //primitive
+  def many[A](p: Parser[A]): Parser[List[A]] = map2(p, many(p))(aAndListA => aAndListA._1 :: aAndListA._2) or succeed(Nil)
   def many1[A](p: Parser[A]): Parser[List[A]] = map2(p, many(p))(aAndListA => aAndListA._1 :: aAndListA._2)
   def occurrences(c: Char): Parser[Int] = char(c).slice.map(_.length)
   val numA = occurrences('a')
@@ -32,7 +31,6 @@ trait Parsers[ParserError, Parser[+ _]]{ self =>    //[+ _] is used when the out
     def or[B >: A](p2: => Parser[B]): Parser[B] = self.or(p, p2)
     def map[B](f: A => B): Parser[B] = self.map(p)(f)
     def map2[B, C](p2: Parser[B])(f: ((A, B)) => C): Parser[C] = self.map2(p, p2)(f)
-    def flatMap[B](f: A => Parser[B]): Parser[B] = self.flatMap(p)(f)
     def many: Parser[List[A]] = self.many(p)
     def many1: Parser[List[A]] = self.many1(p)
     def slice[A]: Parser[String] = self.slice(p)
@@ -50,8 +48,20 @@ trait Parsers[ParserError, Parser[+ _]]{ self =>    //[+ _] is used when the out
     //forAll(gen.flatMap(s => genFunc.map(func => (s, func))))(strAndFunc =>
       //run(p.map(a => strAndFunc._2(a.toString)))(strAndFunc._1)) == run()
 
-    def unit[A](a: A)(gen: Gen[String]) =
+    def unit[A](a: A)(gen: Gen[String]): Prop =
       forAll(gen)(s => run(succeed(a))(s) == Right(a))
+
+    def product[A, B](p1: Parser[A], p2: Parser[B])(gen: Gen[String]): Prop =
+      forAll(gen)(s => {
+        val resOfParser1E: Either[ParserError, A] = run(p1)(s)
+        val restOfStringOfParsing1E: Either[ParserError, String] = run(p1.slice.map(slice => s.substring(slice.length)))(s)
+
+        val resOfParser2E: Either[ParserError, B] = restOfStringOfParsing1E.fold(e => Left(e), str2 => {
+          run(p2)(str2)
+        })
+
+        resOfParser1E.fold(e => Left(e), a => resOfParser2E.fold(Left(_), Right(a, _))) == run(p1 ** p2)(s)
+      })
   }
   /** Laws:
     * run(char(c))(c.toString) == Right(c)
@@ -82,5 +92,8 @@ trait Parsers[ParserError, Parser[+ _]]{ self =>    //[+ _] is used when the out
     * Not necessarely: run(occurrencesAtLeastOne("a)" | occurrencesAtLeastOne("b"))("") == run(occurrencesAtLeastOne("a)" | occurrencesAtLeastOne("b"))("")
     * Associativity must hold.
     * Combiner(|) + Unit + Associativity => Monoid
+    * + Map => Functor
+    *
+    *
     */
 }
