@@ -34,7 +34,7 @@ trait Stream[+A] {
     convert(this, ListBuffer.empty[A])
   }
 
-  def takeN(n: Int) = {
+  def takeN(n: Int): List[A] = {
     @scala.annotation.tailrec
     def takeFromStream(stream: => Stream[A], n: Int, acc: ListBuffer[A]): List[A] = {
       if (n > 0)
@@ -206,6 +206,7 @@ case class Cons[+A](h: () => A, t: () => Stream[A]) extends Stream[A]
 
 
 object Stream {
+
   def cons[A](hd: => A, tl: => Stream[A]): Stream[A] = {
     lazy val head = hd
     lazy val tail = tl
@@ -217,5 +218,7 @@ object Stream {
   def apply[A](as: A*): Stream[A] =
     if (as.isEmpty) empty
     else cons(as.head, apply(as.tail: _*))
+
+  def from(i: Int): Stream[Int] = cons(i, from(i + 1))
 }
 

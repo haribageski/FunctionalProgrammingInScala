@@ -4,6 +4,8 @@ import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.{Callable, CountDownLatch, ExecutorService, TimeUnit, Future => JavaFuture}
 
 import akka.actor.Actor
+import akka.actor.ActorSystem
+import akka.actor.Props
 
 import scala.concurrent.{CanAwait, ExecutionContext, TimeoutException}
 import scala.concurrent.duration.{Duration, TimeUnit}
@@ -11,7 +13,7 @@ import scala.util.Try
 
 object Par {
   sealed trait Future[A] {
-    private[parallelism] def apply(k: A => Unit, e: Throwable => Unit): Unit
+    def apply(k: A => Unit, e: Throwable => Unit): Unit
   }
 
   type Par[A] = ExecutorService => JavaFuture[A]
@@ -50,24 +52,29 @@ object Par {
   /**
     * Implementation via Actors. It works for bounded thread pool.
     */
-  def map2[A,B,C](p: ParAsync[A], p2: ParAsync[B])(f: (A,B) => C): ParAsync[C] =
+  def map2UsingActors[A,B,C](p: ParAsync[A], p2: ParAsync[B])(f: (A,B) => C): ParAsync[C] =
     es => new Future[C] {
-      def apply(cb: C => Unit): Unit = {
+      override def apply(cb: C => Unit, e: (Throwable) => Unit): Unit = {
         var ar: Option[A] = None
         var br: Option[B] = None
 
-        val combiner = Actor[Either[A, B]] {
-          case Left(a) => br match {
-            case None => ar = Some(a)
-            case Some(b) => eval(es)(cb(f(a, b)))
-          }
-          case Right(b) => ar match {
-            case None => br = Some(b)
-            case Some(a) => eval(es)(cb(f(a, b)))
-          }
+        class MyActor extends Actor {
+          override def receive: Receive = {
+            case Left(a: A) => br match {
+              case None => ar = Some(a)
+              case Some(b) => eval(es)(cb(f(a, b)))
+            }
+            case Right(b: B) => ar match {
+              case None => br = Some(b)
+              case Some(a) => eval(es)(cb(f(a, b)))
+            }
         }
-        p(es)(a => combiner ! Left(a))
-        p2(es)(b => combiner ! Right(b))
+        }
+        val system = ActorSystem("HelloSystem")
+        val actorinstance = system.actorOf(Props[MyActor])
+
+        p(es)(a => actorinstance ! Left(a), ???)
+        p2(es)(b => actorinstance ! Right(b), ??? )
       }
     }
 
@@ -163,17 +170,19 @@ object Par {
   def choiceN[A](n: ParAsync[Int])(choices: List[ParAsync[A]]): ParAsync[A] = {
     es =>
       var index = 0
-      n(es)(index = _)
+      n(es)(index = _, println)
       choices(index)(es)
   }
 
   def flatMap[A,B](a: ParAsync[A])(f: A => ParAsync[B]): ParAsync[B] = {
-    join(map(a)(f))
+    val parF: (ExecutorService) => (A) => ParAsync[B] = (es: ExecutorService) => f
+    es =>
+      parF(es)(run(es)(a))(es)
   }
 
-  def join[A](a: ParAsync[ParAsync[A]]): ParAsync[A] = {
+  def join[A](a: => ParAsync[ParAsync[A]]): ParAsync[A] = {
     es =>
-      map(a)(p => run(es)(p))(es)
+      run(es)(a)(es)
   }
 
   def joinViaFlatMap[A](a: ParAsync[ParAsync[A]]): ParAsync[A] = {

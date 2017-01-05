@@ -12,13 +12,14 @@ object Generator {
     }
   }
 
-  val int: State[RNG, Int] =
+  val int: State[RNG, Int] = State(
     (rng: RNG) =>
       rng.nextInt
+  )
 
-
+  //The generated value will be a double between 0 and 1
   def double: State[RNG, Double] =
-    int.map(_.toDouble / Int.MaxValue)
+    nonNegativeInt.map(_.toDouble / Int.MaxValue)
 
 
   def double2(rng: RNG): ((Double, Double), RNG) = {
@@ -39,7 +40,7 @@ object Generator {
       if (count == 0) acc.reverse
       else {
         val (i, nextRng) = rng.nextInt
-        generageRandInts(count - 1, nextRng, State(rng => rng.nextInt) :: acc)
+        generageRandInts(count - 1, nextRng, State[RNG, Int](rng => rng.nextInt) :: acc)
       }
     }
     State.sequence(generageRandInts(count, rng, Nil))
@@ -60,7 +61,7 @@ object Generator {
 
   def nonNegativeEven: State[RNG, Int] = nonNegativeInt.map(i => i - i % 2)
 
-  def both[A, B](ra: Rand[A], rb: Rand[B]): State[RNG, (A, B)] = ra.map2(, rb)((_, _))
+  def both[A, B](ra: Rand[A], rb: Rand[B]): State[RNG, (A, B)] = ra.map2(rb)((_, _))
 
   val randIntDouble: Rand[(Int, Double)] = both(int, double)
   val randDoubleInt: Rand[(Double, Int)] = both(double, int)
@@ -73,6 +74,17 @@ object Generator {
         if (i + (n - 1) - mod >= 0)
           (mod, rng2)
         else nonNegativeLessThan(n).run(rng2)
+    }
+  }
+
+  def nonNegativeLessThan(d: Double): Rand[Double] = {
+    State {
+      rng: RNG =>
+        val (i, rng2) = nonNegativeInt.run(rng)
+        val mod = i % d
+        if (i + (d - 1) - mod >= 0)
+          (mod, rng2)
+        else nonNegativeLessThan(d).run(rng2)
     }
   }
 }

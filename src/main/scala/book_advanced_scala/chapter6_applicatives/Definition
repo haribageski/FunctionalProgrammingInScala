@@ -48,7 +48,7 @@ def totalTraffic: Future[Int] = Applicative[Future].apply3(
         b <- fail2
     } yield a + b
     // res0: ErrorOr[Int] = -\/(Fail1)
-    //Breaks after the first failier
+    //Breaks after the first failure
 
 Solution using combine(a: A, b: A) => F[A]
     Applicative[ErrorOr].apply2(fail1, fail2)(_ + _)

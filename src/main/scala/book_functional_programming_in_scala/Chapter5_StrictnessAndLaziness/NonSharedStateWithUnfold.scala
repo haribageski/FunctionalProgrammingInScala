@@ -21,11 +21,6 @@ object NonSharedStateWithUnfold {
 
   def from(n: Int): Stream[Int] = unfold(Stream(n))(_.headOptionLazy().map(z => (z, Stream(z+1))))
 
-
-
-  println("Fibonaci2:" + fibs.takeN(5))
-  println(from(-10).takeN(15))
-
   val naturalNums: Stream[Int] = from(0)
   println(unfold(naturalNums)((state: Stream[Int]) => state match {
     case Cons(h, t) => {
