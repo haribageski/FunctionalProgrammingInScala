@@ -17,7 +17,10 @@ trait Parsers[ParserError, Parser[+ _]]{ self =>    //[+ _] is used when the out
   implicit def operators[A](p: Parser[A]): ParserOps[A] = ParserOps(p)
   implicit def asStringParser[A](a: A)(implicit f: A => Parser[String]): ParserOps[String] = ParserOps(f(a))
   def slice[A](p: Parser[A]): Parser[String]    //primitive
-  def listOfN[A](n: Int, p: Parser[A]): Parser[List[A]]   //primitive
+  def listOfN[A](n: Int, p: Parser[A]): Parser[List[A]] = n match {
+      case 0 => succeed(Nil)
+      case _ => map2(p, listOfN(n - 1, p))((aAndLisA: (A, List[A])) => aAndLisA._1 :: aAndLisA._2)
+    }
   def many[A](p: Parser[A]): Parser[List[A]] = map2(p, many(p))(aAndListA => aAndListA._1 :: aAndListA._2) or succeed(Nil)
   def many1[A](p: Parser[A]): Parser[List[A]] = map2(p, many(p))(aAndListA => aAndListA._1 :: aAndListA._2)
   def occurrences(c: Char): Parser[Int] = char(c).slice.map(_.length)
@@ -26,6 +29,8 @@ trait Parsers[ParserError, Parser[+ _]]{ self =>    //[+ _] is used when the out
   def manyWithMany1[A, B](a: Parser[A], b: Parser[B]): Parser[(Int, Int)] =
     char('a').many.slice.map(_.size) ** char('b').many1.slice.map(_.size)
 
+
+  
   case class ParserOps[A](p: Parser[A]) {
     def |[B >: A](p2: Parser[B]): Parser[B] = self.or(p, p2)
     def or[B >: A](p2: => Parser[B]): Parser[B] = self.or(p, p2)
