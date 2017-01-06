@@ -14,12 +14,25 @@ trait Parsers[ParserError, Parser[+ _]]{ self =>    //[+ _] is used when the out
   def map2[A, B, C](p: Parser[A], p2: => Parser[B])(f: (A, B) => C): Parser[C] = p.flatMap(a => p2.map(f(a, _)))  //lazy second argument is necessary, otherwise many() will never terminate
   def succeed[A](unit: A): Parser[A] = string("").map(_ => unit)
   def flatMap[A, B](p: Parser[A])(f: A => Parser[B]): Parser[B]   //primitive
+  def flatten[A](l: Parser[Parser[A]]): Parser[A] = l.flatMap(p => p)
+  def seq[A](l: List[Parser[A]]): Parser[List[A]] = l.foldLeft(succeed(List.empty[A]))((acc, parserA) => map2(parserA, acc)(_ :: _))
   implicit def regex(r: Regex): Parser[String]
-  def thatManyChars(c: Char) = "[0-9]*".r
+  def thatManyChars(c: Char) = "[0-9]*".r   //we extract the number of character from the beginning of the string we are parsing
     .flatMap(strMatched => listOfN(strMatched.toInt, char(c)))
+  def skipFirstAndTakeSecond[A, B](s1: => Parser[A], s2: Parser[B]): Parser[B] = map2(s1, s2)((_, b) => b)
+  def takeFirstAndSkipSecond[A, B](s1: Parser[A], s2: => Parser[B]): Parser[A] = map2(s1, s2)((a, _) => a)
 
   implicit def char(c: Char): Parser[Char] = string(c.toString).map(_.charAt(0))
   implicit def string(s: String): Parser[String]    //primitive
+  def char: Parser[Char] = regex(""".""".r).map(_.charAt(0))    //TODO: special symbols to be added
+  def digit: Parser[Char] = regex("""\\d""".r).map(_.charAt(0))
+  def whitespace: Parser[String] = regex("""\\s""".r)
+  def stringLiteralWithoutQuotes: Parser[String] = char('"').skipAndTakeNext(stringLiteral).takeAndSkipNext(char('"'))
+  def stringLiteral: Parser[String] = char.many.map(_.toString)
+  def int = digit.many1.map(_.toString.toInt)
+  def double: Parser[Double] = regex("""[0-9]+.[0-9]+e?[0-9]*""".r).map(_.toDouble)
+  def bool: Parser[Boolean] = regex("""true|false""".r).map(_.toBoolean)
+
   implicit def operators[A](p: Parser[A]): ParserOps[A] = ParserOps(p)
   implicit def asStringParser[A](a: A)(implicit f: A => Parser[String]): ParserOps[String] = ParserOps(f(a))
   def slice[A](p: Parser[A]): Parser[String]    //primitive
@@ -40,11 +53,11 @@ trait Parsers[ParserError, Parser[+ _]]{ self =>    //[+ _] is used when the out
     //Faster but danger of stack overflow:
     //map2(p, many(p))(_ :: _) or succeed(Nil)
   }
-  def many1[A](p: Parser[A]): Parser[List[A]] = map2(p, many(p))(_ :: _)
+  def many1[A](p: Parser[A]): Parser[List[A]] = map2(p, many(p))(_ :: _)    //at least one
   def occurrences(c: Char): Parser[Int] = char(c).slice.map(_.length)
   val numA = occurrences('a')
   def occurrencesAtLeastOne(c: Char): Parser[Int]
-  def manyWithMany1[A, B](a: Parser[A], b: Parser[B]): Parser[(Int, Int)] =
+  def manyaWithMany1b[A, B](a: Parser[A], b: Parser[B]): Parser[(Int, Int)] =
     char('a').many.slice.map(_.size) ** char('b').many1.slice.map(_.size)
 
 
@@ -60,6 +73,8 @@ trait Parsers[ParserError, Parser[+ _]]{ self =>    //[+ _] is used when the out
     def slice[A]: Parser[String] = self.slice(p)
     def **[B](p2: Parser[B]): Parser[(A, B)] = self.product(p, p2)
     def product[B](p2: Parser[B]): Parser[(A, B)] = self.product(p, p2)
+    def skipAndTakeNext[B](s2: Parser[B]): Parser[B] = skipFirstAndTakeSecond(p, s2)
+    def takeAndSkipNext[B](s2: => Parser[B]): Parser[A] = takeFirstAndSkipSecond(p, s2)
   }
 
 
