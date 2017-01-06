@@ -10,8 +10,8 @@ trait Parsers[ParserError, Parser[+ _]]{ self =>    //[+ _] is used when the out
   def run[A](p: Parser[A])(input: String): Either[ParserError, A]   //representation
   def or[A](s1: Parser[A], s2: => Parser[A]): Parser[A]  //primitive
   def map[A, B](p: Parser[A])(f: A => B): Parser[B]   //primitive
-  def product[A, B](p1: Parser[A], p2: => Parser[B]): Parser[(A, B)]   //primitive, lazy second argument is necessary, otherwise map2() will never terminate
-  def map2[A, B, C](p: Parser[A], p2: => Parser[B])(f: (A, B) => C): Parser[C] = product(p, p2).map(f.tupled) //lazy second argument is necessary, otherwise many() will never terminate
+  def product[A, B](p1: Parser[A], p2: => Parser[B]): Parser[(A, B)] = p1.flatMap(a => p2.map((a, _)))   //lazy second argument is necessary, otherwise map2() will never terminate
+  def map2[A, B, C](p: Parser[A], p2: => Parser[B])(f: (A, B) => C): Parser[C] = p.flatMap(a => p2.map(f(a, _)))  //lazy second argument is necessary, otherwise many() will never terminate
   def succeed[A](unit: A): Parser[A] = string("").map(_ => unit)
   def flatMap[A, B](p: Parser[A])(f: A => Parser[B]): Parser[B]   //primitive
   implicit def regex(r: Regex): Parser[String]
