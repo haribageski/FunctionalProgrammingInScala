@@ -33,6 +33,7 @@ object Gen {
   def unit[A](a: => A): Gen[A] = {
     Gen(State.unit(a))
   }
+
   def boolean: Gen[Boolean] =
     Gen(Generator.int.map(_ > 0))
 

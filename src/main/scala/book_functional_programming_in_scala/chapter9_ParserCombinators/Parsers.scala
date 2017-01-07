@@ -1,17 +1,17 @@
 package book_functional_programming_in_scala.chapter9_ParserCombinators
 
 import book_functional_programming_in_scala.chapter6_PurelyFunctionalState.SimpleRNG
-import book_functional_programming_in_scala.chapter8_PropertyBasedTesting.{Gen, Prop}
+import book_functional_programming_in_scala.chapter8_PropertyBasedTesting.{Gen, Prop, SGen}
 import book_functional_programming_in_scala.chapter8_PropertyBasedTesting.Prop._
-import book_functional_programming_in_scala.chapter9_ParserCombinators.ParserError.{ReportErrorOfBothLeftAndRightParsers, ReportErrorSide}
+import book_functional_programming_in_scala.chapter9_ParserCombinators.Errors._
+import book_functional_programming_in_scala.chapter9_ParserCombinators.Errors.ParserError._
 
 import scala.util.matching.Regex
 
-trait Parsers[ParserError, Parser[+ _]] {
-  self =>
+trait Parsers[ParserError, Parser[+ _]] { self =>
   //[+ _] is used when the outer type is a type constructor itself
 
-  def run[A](p: Parser[A])(input: String): Either[ParserError, A]
+  def run[A](p: Parser[A])(input: String): Either[ParserErrors, A]
   //representation
   def or[A, B >: A](s1: Parser[A], s2: => Parser[B],
                     reportErrorSide: ReportErrorSide = ReportErrorOfBothLeftAndRightParsers): Parser[B]
@@ -22,7 +22,8 @@ trait Parsers[ParserError, Parser[+ _]] {
   def map2[A, B, C](p: Parser[A], p2: => Parser[B])(f: (A, B) => C): Parser[C] = p.flatMap(a => p2.map(f(a, _)))
   //lazy second argument is necessary, otherwise many() will never terminate
   def succeed[A](elem: A): Parser[A] = string("").map(_ => elem)
-  def failed[A](e: ParserError)(p: Parser[A]): Parser[A]
+  def failed[A](e: ParserErrorMsg)(p: Parser[A]): Parser[A]
+
   //primitive
   def flatMap[A, B](p: Parser[A])(f: A => Parser[B]): Parser[B]
   //primitive
@@ -98,7 +99,7 @@ trait Parsers[ParserError, Parser[+ _]] {
       forAll(in)(s => run(p1)(s) == run(p2)(s))
 
     def mapLaw[A, B](p: Parser[A])(gen: Gen[String], genFunc: Gen[String => B]): Prop =
-      forAll(gen)(s => run(p.map(a => a))(s) == run(p)) //&&
+      forAll(gen)((s: String) => run(p.map(a => a))(s) == run(p)(s)) //&&
     //forAll(gen.flatMap(s => genFunc.map(func => (s, func))))(strAndFunc =>
     //run(p.map(a => strAndFunc._2(a.toString)))(strAndFunc._1)) == run()
 
@@ -108,10 +109,10 @@ trait Parsers[ParserError, Parser[+ _]] {
     //The product of two parsers must result with the error of the left parser if it results with an error.
     def product[A, B](p1: Parser[A], p2: Parser[B])(gen: Gen[String]): Prop =
       forAll(gen)(s => {
-        val resOfParser1E: Either[ParserError, A] = run(p1)(s)
-        val restOfStringOfParsing1E: Either[ParserError, String] = run(p1.slice.map(slice => s.substring(slice.length)))(s)
+        val resOfParser1E: Either[ParserErrors, A] = run(p1)(s)
+        val restOfStringOfParsing1E: Either[ParserErrors, String] = run(p1.slice.map(slice => s.substring(slice.length)))(s)
 
-        val resOfParser2E: Either[ParserError, B] = restOfStringOfParsing1E.fold(e => Left(e), str2 => {
+        val resOfParser2E: Either[ParserErrors, B] = restOfStringOfParsing1E.fold(e => Left(e), str2 => {
           run(p2)(str2)
         })
 
@@ -123,20 +124,23 @@ trait Parsers[ParserError, Parser[+ _]] {
       forAll(genStr)(s => {
         val parser: Parser[String] = self.string(s)
 
-        Gen.choose(0, s.length - 1).map(position => {
-          val strWithChangedLetter: String = s.substring(0, position) ++ (s.charAt(position) match {
+        Gen.choose(0, s.length - 1).map(location => {
+          val strWithChangedLetter: String = s.substring(0, location) ++ (s.charAt(location) match {
             case c if c.isUpper => c.toString.toLowerCase
             case c => c.toString.toUpperCase
-          }) ++ s.substring(position + 1, s.length)
+          }) ++ s.substring(location + 1, s.length)
 
-          run(parser)(strWithChangedLetter) == Left(ParserErrors(Set(ParserError(position, Message(
-            s.charAt(position) match {
-              case c if c.isUpper => c.toString.toLowerCase
-              case c => c.toString.toUpperCase
-            }, s.charAt(position).toString
-          )))))
+          run(parser)(strWithChangedLetter) == Left(ParserErrors(Set(ParserError(Location(location, strWithChangedLetter), s))))
         }).sample.run(SimpleRNG(0))._1
       })
+
+    def labelLaw[A](p: Parser[A], inputsGen: SGen[String], errorMsgGen: SGen[ParserErrorMsg]): Prop =
+      forAll(inputsGen ** errorMsgGen) { case (input: String, errorMsg: ParserErrorMsg) =>
+        run(failed(errorMsg)(p))(input) match {
+          case Left(e: Errors.ParserError) => e.msg == errorMsg
+          case _ => false
+        }
+      }
 
     /** Laws:
       * run(char(c))(c.toString) == Right(c)

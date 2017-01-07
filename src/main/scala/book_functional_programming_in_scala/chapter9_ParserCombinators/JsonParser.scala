@@ -20,7 +20,7 @@ object JsonParser{
         (jObjectParser | jArrayParser | jNullParser | jLiteralParser)
         .takeAndSkipNext(regex("""s*\]|,s*""".r))
         .many
-        .map(list => JArray(list.toArray))
+        .map(list => JArray(list.toIndexedSeq))
     }
 
     def jObjectParser: Parser[JObject] = {
