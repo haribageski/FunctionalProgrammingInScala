@@ -29,7 +29,6 @@ object JsonParser{
           whitespace.many skipAndTakeNext char(':') skipAndTakeNext whitespace.many skipAndTakeNext
             (jObjectParser | jArrayParser | jNullParser | jLiteralParser) takeAndSkipNext regex("""s*,|$""".r)
           )
-
       val jObject: Parser[JObject] = keyValue.many
         .map(l => Map(l :_*))
         .map(JObject(_))
