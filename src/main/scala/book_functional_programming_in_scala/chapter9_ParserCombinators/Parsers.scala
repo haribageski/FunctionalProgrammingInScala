@@ -29,7 +29,7 @@ trait Parsers[Parser[+ _]] { self =>
   def failed[A](e: ParserErrorMsg)(p: Parser[A]): Parser[A]   //In the book it is named 'label()'.
   def scope[A](e: ParserErrorMsg)(p: Parser[A]): Parser[A]    //It adds the error on top of the existing errors.
   def attempt[A](p: Parser[A]): Parser[A]   //Change the state to un-committed.
-  
+
   //primitive
   def flatMap[A, B](p: Parser[A])(f: A => Parser[B]): Parser[B]
   //primitive

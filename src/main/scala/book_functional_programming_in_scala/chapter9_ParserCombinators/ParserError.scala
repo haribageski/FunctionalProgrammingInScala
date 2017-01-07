@@ -5,6 +5,10 @@ import book_functional_programming_in_scala.chapter9_ParserCombinators.Parsers
 object Errors {
   type ParserErrorMsg = String
 
+  sealed trait CommittedStatusOfError
+  object Committed extends CommittedStatusOfError
+  object Uncommitted extends CommittedStatusOfError
+
   case class Location(location: Int, input: String) {
     require(input.length > location)
     lazy val line = input.slice(0, location + 1).count(_ == '\n') + 1
@@ -15,7 +19,7 @@ object Errors {
 
   case class ParserError(msg: ParserErrorMsg)
 
-  case class ParserErrors(errors: List[(Location, ParserErrorMsg)])
+  case class ParserErrors(errors: List[(Location, ParserErrorMsg)], committedStatusOfError: CommittedStatusOfError = Committed)
 
 
   object ParserError {
