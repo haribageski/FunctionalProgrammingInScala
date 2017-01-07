@@ -10,14 +10,15 @@ import scala.util.matching.Regex
 
 /**
   * Library for parsing.
+  * By default a Parser is in committed state, meaning if we apply or to it (as a left branch), and if both branches fail,
+  * we take the error from the left branch. If in uncommitted state, we take the error from the right branch.
   */
 trait Parsers[Parser[+ _]] { self =>
   //[+ _] is used when the outer type is a type constructor itself
 
   def run[A](p: Parser[A])(input: String): Either[ParserErrors, A]
   //representation
-  def or[A, B >: A](s1: Parser[A], s2: => Parser[B],
-                    reportErrorSide: ReportErrorSide = ReportErrorOfBothLeftAndRightParsers): Parser[B]
+  def or[A, B >: A](s1: Parser[A], s2: => Parser[B]): Parser[B]
   //primitive
   def map[A, B](p: Parser[A])(f: A => B): Parser[B] = p.flatMap(a => succeed(f(a)))
   def product[A, B](p1: Parser[A], p2: => Parser[B]): Parser[(A, B)] = p1.flatMap(a => p2.map((a, _)))
@@ -27,7 +28,8 @@ trait Parsers[Parser[+ _]] { self =>
   def succeed[A](elem: A): Parser[A] = string("").map(_ => elem)
   def failed[A](e: ParserErrorMsg)(p: Parser[A]): Parser[A]   //In the book it is named 'label()'.
   def scope[A](e: ParserErrorMsg)(p: Parser[A]): Parser[A]    //It adds the error on top of the existing errors.
-
+  def attempt[A](p: Parser[A]): Parser[A]   //Change the state to un-committed.
+  
   //primitive
   def flatMap[A, B](p: Parser[A])(f: A => Parser[B]): Parser[B]
   //primitive
