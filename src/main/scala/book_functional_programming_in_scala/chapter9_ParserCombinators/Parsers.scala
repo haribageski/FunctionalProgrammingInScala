@@ -8,7 +8,10 @@ import book_functional_programming_in_scala.chapter9_ParserCombinators.Errors.Pa
 
 import scala.util.matching.Regex
 
-trait Parsers[ParserError, Parser[+ _]] { self =>
+/**
+  * Library for parsing.
+  */
+trait Parsers[Parser[+ _]] { self =>
   //[+ _] is used when the outer type is a type constructor itself
 
   def run[A](p: Parser[A])(input: String): Either[ParserErrors, A]
@@ -22,7 +25,8 @@ trait Parsers[ParserError, Parser[+ _]] { self =>
   def map2[A, B, C](p: Parser[A], p2: => Parser[B])(f: (A, B) => C): Parser[C] = p.flatMap(a => p2.map(f(a, _)))
   //lazy second argument is necessary, otherwise many() will never terminate
   def succeed[A](elem: A): Parser[A] = string("").map(_ => elem)
-  def failed[A](e: ParserErrorMsg)(p: Parser[A]): Parser[A]
+  def failed[A](e: ParserErrorMsg)(p: Parser[A]): Parser[A]   //In the book it is named 'label()'.
+  def scope[A](e: ParserErrorMsg)(p: Parser[A]): Parser[A]    //It adds the error on top of the existing errors.
 
   //primitive
   def flatMap[A, B](p: Parser[A])(f: A => Parser[B]): Parser[B]
@@ -130,7 +134,7 @@ trait Parsers[ParserError, Parser[+ _]] { self =>
             case c => c.toString.toUpperCase
           }) ++ s.substring(location + 1, s.length)
 
-          run(parser)(strWithChangedLetter) == Left(ParserErrors(Set(ParserError(Location(location, strWithChangedLetter), s))))
+          run(parser)(strWithChangedLetter) == Left(ParserErrors(List((Location(location, strWithChangedLetter), s))))
         }).sample.run(SimpleRNG(0))._1
       })
 

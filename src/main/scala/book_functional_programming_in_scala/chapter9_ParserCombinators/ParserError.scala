@@ -15,7 +15,7 @@ object Errors {
 
   case class ParserError(msg: ParserErrorMsg)
 
-  case class ParserErrors(errors: Set[ParserError])
+  case class ParserErrors(errors: List[(Location, ParserErrorMsg)])
 
 
   object ParserError {

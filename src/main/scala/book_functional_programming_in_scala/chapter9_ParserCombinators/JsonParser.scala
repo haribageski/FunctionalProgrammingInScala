@@ -5,7 +5,7 @@ class JsonParser extends Parser[JSON]
 
 
 object JsonParser{
-  def jsonParser[Err,Parser[+_]](P: Parsers[Err,Parser]): Parser[JSON] = {
+  def jsonParser[Parser[+_]](P: Parsers[Parser]): Parser[JSON] = {
     import P._
 
     val jNullParser: Parser[JNull.type] = string("null").map(_ => JNull)
