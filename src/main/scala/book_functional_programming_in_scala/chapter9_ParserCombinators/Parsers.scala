@@ -1,10 +1,9 @@
 package book_functional_programming_in_scala.chapter9_ParserCombinators
 
 import book_functional_programming_in_scala.chapter6_PurelyFunctionalState.SimpleRNG
-import book_functional_programming_in_scala.chapter8_PropertyBasedTesting.{Gen, Prop, SGen}
 import book_functional_programming_in_scala.chapter8_PropertyBasedTesting.Prop._
+import book_functional_programming_in_scala.chapter8_PropertyBasedTesting.{Gen, Prop, SGen}
 import book_functional_programming_in_scala.chapter9_ParserCombinators.Errors._
-import book_functional_programming_in_scala.chapter9_ParserCombinators.Errors.ParserError._
 
 import scala.util.matching.Regex
 
@@ -26,14 +25,14 @@ trait Parsers[Parser[+ _]] { self =>
   def map2[A, B, C](p: Parser[A], p2: => Parser[B])(f: (A, B) => C): Parser[C] = p.flatMap(a => p2.map(f(a, _)))
   //lazy second argument is necessary, otherwise many() will never terminate
   def succeed[A](elem: A): Parser[A] = string("").map(_ => elem)
-  def failed[A](e: ParserErrorMsg)(p: Parser[A]): Parser[A]   //In the book it is named 'label()'.
-  def scope[A](e: ParserErrorMsg)(p: Parser[A]): Parser[A]    //It adds the error on top of the existing errors.
+  def failed[A](e: ParserErrorMsg)(p: Parser[A]): Parser[A]   //primitive: The resulting Parser always returns Error(e) when run.
+  def label[A](e: ParserErrorMsg)(p: Parser[A]): Parser[A]    //primitive: In the event of failure, replaces the assigned message with e
+  def scope[A](e: ParserErrors)(p: Parser[A]): Parser[A]    //It adds the error on top of the existing errors.
   def attempt[A](p: Parser[A]): Parser[A]   //Change the state to un-committed.
 
-  //primitive
   def flatMap[A, B](p: Parser[A])(f: A => Parser[B]): Parser[B]
-  //primitive
-  def flatten[A](l: Parser[Parser[A]]): Parser[A] = l.flatMap(p => p)
+  def flatten[A](p: Parser[Parser[A]]): Parser[A]
+
   def seq[A](l: List[Parser[A]]): Parser[List[A]] = l.foldLeft(succeed(List.empty[A]))((acc, parserA) => map2(parserA, acc)(_ :: _))
     .map(_.reverse)
   implicit def regex(r: Regex): Parser[String]
@@ -58,8 +57,7 @@ trait Parsers[Parser[+ _]] { self =>
 
   implicit def operators[A](p: Parser[A]): ParserOps[A] = ParserOps(p)
   implicit def asStringParser[A](a: A)(implicit f: A => Parser[String]): ParserOps[String] = ParserOps(f(a))
-  def slice[A](p: Parser[A]): Parser[String]
-  //primitive
+  def slice[A](p: Parser[A]): Parser[String]    //primitive: Returns the portion of input inspected by p if successful.
   def listOfN[A](n: Int, p: Parser[A]): Parser[List[A]] = n match {
     case 0 => succeed(Nil)
     case _ => map2(p, listOfN(n - 1, p))(_ :: _)
@@ -98,6 +96,7 @@ trait Parsers[Parser[+ _]] { self =>
     def product[B](p2: Parser[B]): Parser[(A, B)] = self.product(p, p2)
     def skipAndTakeNext[B](s2: Parser[B]): Parser[B] = skipFirstAndTakeSecond(p, s2)
     def takeAndSkipNext[B](s2: => Parser[B]): Parser[A] = takeFirstAndSkipSecond(p, s2)
+    def failed(e: ParserErrorMsg): Parser[A] = self.failed(e)(p)
   }
 
   object Laws {
@@ -136,7 +135,7 @@ trait Parsers[Parser[+ _]] { self =>
             case c => c.toString.toUpperCase
           }) ++ s.substring(location + 1, s.length)
 
-          run(parser)(strWithChangedLetter) == Left(ParserErrors(List((Location(location, strWithChangedLetter), s))))
+          run(parser)(strWithChangedLetter) == Left(ParserErrors(List((KnownLocation(location, strWithChangedLetter), s))))
         }).sample.run(SimpleRNG(0))._1
       })
 
