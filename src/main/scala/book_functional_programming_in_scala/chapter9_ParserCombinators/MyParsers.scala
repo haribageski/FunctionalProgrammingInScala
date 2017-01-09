@@ -57,17 +57,13 @@ object MyParsers extends Parsers[Parser] {
 
 
   implicit def string(s: String): Parser[String] = {
-    @scala.annotation.tailrec
-    def matchInput(input: String, positionToMatch: Int): Parser.Result[String] = positionToMatch match {
-      case i if i == s.size => Success(s, i)
-      case i if i >= input.length || (input.charAt(i) != s.charAt(i)) =>
-        Failure(ParserErrors(List(ParserError(KnownLocation(i, input), s"Input $input does not start with $s"))))
-      case i => matchInput(input, positionToMatch + 1)
-    }
-    Parser {
-      case KnownLocation(location, input) => matchInput(input, location)
+    val parser = Parser {
+      case KnownLocation(location, input) =>
+        if (input.startsWith(s, location)) Success(s, s.length)
+        else Failure(ParserErrors().push(KnownLocation(location, input), ""))
       case UnknownLocation(input) => Failure(ParserErrors(List(ParserError(UnknownLocation(input), s))))
     }
+    scope(s"Input doesn't start with $s at the specified starting index.")(parser)
   }
 
   def succeed[A](elem: A): Parser[A] = Parser(location => Success(elem, 0))
@@ -80,15 +76,18 @@ object MyParsers extends Parsers[Parser] {
     location => {
       r.findFirstIn(location.input) match {
         case Some(str) => Success(str, str.length)
-        case None =>      Failure(ParserErrors(List(ParserError(UnknownLocation(location.input), r.pattern.pattern))))
+        case None =>      Failure(ParserErrors(List(ParserError(location, r.pattern.pattern))))
       }
     }
   ) //primitive: Recognizes a regular expression s
 
-  def scope[A](errorsToAdd: ParserErrors)(p: Parser[A]): Parser[A] = ??? //p.copy(input => p.run(input).left.map(errors => ParserErrors(errorsToAdd.errors ::: errors.errors)))
+  def scope[A](errorMsg: ParserErrorMsg)(p: Parser[A]): Parser[A] = Parser {
+    location => p.run(location).mapError(_.push(location, errorMsg))
+  }
 
-  def label[A](e: ParserErrorMsg)(p: Parser[A]): Parser[A] = ???
-//    p.copy(input => p.run(input).left.map(_ => ParserErrors(List(ParserError(UnknownLocation(input), e)))))
+  def label[A](errorMsg: ParserErrorMsg)(p: Parser[A]): Parser[A] = Parser {
+    location => p.run(location).mapError(_ => ParserErrors().push(location, errorMsg))
+  }
 
   override def slice[A](p: Parser[A]): Parser[String] = p.copy(location => p.run(location) match {
     case Success(get, charsConsumed) => Success(location.input.take(charsConsumed), charsConsumed)

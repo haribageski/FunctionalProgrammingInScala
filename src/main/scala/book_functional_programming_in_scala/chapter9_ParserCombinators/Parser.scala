@@ -12,11 +12,17 @@ case class Parser[+A](
     case Success(get, charsConsumed) => Right(get)
     case Failure(get) => Left(get)
   }
+
 }
 
 object Parser {
   type InspectedInput = String
-  sealed trait Result[+A]
+  sealed trait Result[+A] {
+    def mapError(f: ParserErrors => ParserErrors): Result[A] = this match {
+      case Success(get, charsConsumed) => Success(get, charsConsumed)
+      case Failure(get) =>    Failure(f(get))
+    }
+  }
   case class Success[+A](get: A, charsConsumed: Int) extends Result[A]
   case class Failure(get: ParserErrors) extends Result[Nothing]
 

@@ -27,7 +27,7 @@ trait Parsers[Parser[+ _]] { self =>
   def succeed[A](elem: A): Parser[A]
   def failed[A](e: ParserErrorMsg)(p: Parser[A]): Parser[A]   //primitive: The resulting Parser always returns Error(e) when run.
   def label[A](e: ParserErrorMsg)(p: Parser[A]): Parser[A]    //primitive: In the event of failure, replaces the assigned message with e
-  def scope[A](e: ParserErrors)(p: Parser[A]): Parser[A]    //It adds the error on top of the existing errors.
+  def scope[A](errorMsg: String)(p: Parser[A]): Parser[A]    //It adds the error on top of the existing errors.
   def attempt[A](p: Parser[A]): Parser[A]   //Change the state to un-committed.
 
   def flatMap[A, B](p: Parser[A])(f: A => Parser[B]): Parser[B]
