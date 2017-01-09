@@ -24,7 +24,7 @@ trait Parsers[Parser[+ _]] { self =>
   //lazy second argument is necessary, otherwise map2() will never terminate
   def map2[A, B, C](p: Parser[A], p2: => Parser[B])(f: (A, B) => C): Parser[C] = p.flatMap(a => p2.map(f(a, _)))
   //lazy second argument is necessary, otherwise many() will never terminate
-  def succeed[A](elem: A): Parser[A] = string("").map(_ => elem)
+  def succeed[A](elem: A): Parser[A]
   def failed[A](e: ParserErrorMsg)(p: Parser[A]): Parser[A]   //primitive: The resulting Parser always returns Error(e) when run.
   def label[A](e: ParserErrorMsg)(p: Parser[A]): Parser[A]    //primitive: In the event of failure, replaces the assigned message with e
   def scope[A](e: ParserErrors)(p: Parser[A]): Parser[A]    //It adds the error on top of the existing errors.
@@ -135,14 +135,14 @@ trait Parsers[Parser[+ _]] { self =>
             case c => c.toString.toUpperCase
           }) ++ s.substring(location + 1, s.length)
 
-          run(parser)(strWithChangedLetter) == Left(ParserErrors(List((KnownLocation(location, strWithChangedLetter), s))))
+          run(parser)(strWithChangedLetter) == Left(ParserErrors(List(ParserError(KnownLocation(location, strWithChangedLetter), s))))
         }).sample.run(SimpleRNG(0))._1
       })
 
     def labelLaw[A](p: Parser[A], inputsGen: SGen[String], errorMsgGen: SGen[ParserErrorMsg]): Prop =
       forAll(inputsGen ** errorMsgGen) { case (input: String, errorMsg: ParserErrorMsg) =>
         run(failed(errorMsg)(p))(input) match {
-          case Left(e: Errors.ParserError) => e.msg == errorMsg
+          case Left(e: Errors.ParserErrors) => e.msg == errorMsg
           case _ => false
         }
       }
