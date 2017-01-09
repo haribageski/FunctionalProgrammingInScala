@@ -3,10 +3,6 @@ package book_functional_programming_in_scala.chapter9_ParserCombinators
 object Errors {
   type ParserErrorMsg = String
 
-  sealed trait CommittedStatusOfError
-  object Committed extends CommittedStatusOfError
-  object Uncommitted extends CommittedStatusOfError
-
   sealed class Location(val input: String)
 
   case class KnownLocation(location: Int, override val input: String) extends Location(input) {
@@ -36,7 +32,7 @@ object Errors {
 
   case class ParserErrors(errors: List[ParserError]) {
     def msg = errors.foldLeft("")(_ + '\n' + _.errorMessage)
-    def push(loc: Location, msg: String): ParserErrors = copy(errors = ParserError(loc,msg) :: errors)
+    def push(loc: Location, expectedInput: String): ParserErrors = copy(errors = ParserError(loc, expectedInput) :: errors)
     def label[A](s: String): ParserErrors = ParserErrors(latestLoc.map(ParserError(_,s)).toList)    //Change the error message of the last message
     def latestLoc: Option[Location] = latest.map(_.location)
     def latest: Option[ParserError] = errors.lastOption     //Last message is the most detailed from inner scopes

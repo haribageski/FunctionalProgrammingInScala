@@ -2,9 +2,8 @@ package book_functional_programming_in_scala.chapter9_ParserCombinators
 
 import book_functional_programming_in_scala.chapter8_PropertyBasedTesting.Prop._
 import book_functional_programming_in_scala.chapter9_ParserCombinators.Errors._
-import book_functional_programming_in_scala.chapter9_ParserCombinators.Parser.{Failure, InspectedInput, Success}
+import book_functional_programming_in_scala.chapter9_ParserCombinators.Parser.{Failure, Success}
 
-import scala.util.Left
 import scala.util.matching.Regex
 
 /**
@@ -15,27 +14,13 @@ import scala.util.matching.Regex
 object MyParsers extends Parsers[Parser] {
   override def run[A](p: Parser[A])(input: String): Either[ParserErrors, A] = ??? //p.run(input).right.map(_._1)
 
-  override def or[A, B >: A](s1: Parser[A], s2: => Parser[B]): Parser[B] = ???
-//  Parser(
-//    input => {
-//      s1.run(input) match {
-//        case Left(errors) =>
-//          s2.run(input)
-//            .left.map{ errors2 =>
-//            (s1.committedStatusOfError, s2.committedStatusOfError) match {
-//              case (Committed, Committed)   => ParserErrors(errors.errors ::: errors2.errors)
-//              case (Committed, Uncommitted) => errors
-//              case (Uncommitted, _)         => errors2
-//            }}
-//        case r: Right[ParserErrors, B] => r
-//      }
-//    }, (s1.committedStatusOfError, s2.committedStatusOfError) match {
-//      case (Uncommitted, Uncommitted) =>  Uncommitted
-//      case _                          =>  Committed
-//    }
-//  )
+  override def or[A, B >: A](s1: Parser[A], s2: => Parser[B]): Parser[B] =
+    s1.copy(errorLocation => s1.run(errorLocation) match {
+      case Failure(get, false)    =>    s2.run(errorLocation)
+      case r                      => r
+    })
 
-  def attempt[A](p: Parser[A]): Parser[A] = p.copy(committedStatusOfError = Uncommitted)
+  def attempt[A](p: Parser[A]): Parser[A] = p.copy(errorLocat => p.run(errorLocat).uncommit)    //converts committed to uncommitted Failure (in case of Failure)
 
   def flatMap[A, B](p: Parser[A])(f: A => Parser[B]): Parser[B] = ???
 //  {
@@ -57,11 +42,18 @@ object MyParsers extends Parsers[Parser] {
 
 
   implicit def string(s: String): Parser[String] = {
+    def consume(locationInInput: Location)(index: Int, strToMatch: String): Parser.Result[String] = locationInInput match {
+      case KnownLocation(location, input) => {
+        if (strToMatch.isEmpty)    Success(s, s.length)
+        else if(index + location >= input.length || input.charAt(index + location) != strToMatch.head)
+          if(index == 0)  Failure(ParserErrors().push(KnownLocation(index + location, input), s), false)
+          else            Failure(ParserErrors().push(KnownLocation(index + location, input), s), true)
+        else   consume(locationInInput)(index + 1, strToMatch.tail)
+      }
+      case UnknownLocation(input) => Failure(ParserErrors().push(UnknownLocation(input), s), false)
+    }
     val parser = Parser {
-      case KnownLocation(location, input) =>
-        if (input.startsWith(s, location)) Success(s, s.length)
-        else Failure(ParserErrors().push(KnownLocation(location, input), ""))
-      case UnknownLocation(input) => Failure(ParserErrors(List(ParserError(UnknownLocation(input), s))))
+      location => consume(location)(0, location.input)
     }
     scope(s"Input doesn't start with $s at the specified starting index.")(parser)
   }
@@ -69,14 +61,14 @@ object MyParsers extends Parsers[Parser] {
   def succeed[A](elem: A): Parser[A] = Parser(location => Success(elem, 0))
 
   def failed[A](e: ParserErrorMsg)(p: Parser[A]): Parser[A] = {
-    p.copy(location => Failure(ParserErrors(List(ParserError(UnknownLocation(location.input), e)))))
+    p.copy(location => Failure(ParserErrors(List(ParserError(UnknownLocation(location.input), e))), false))
   }//primitive: The resulting Parser always returns Error(e) when run.
 
   implicit def regex(r: Regex): Parser[String] = Parser(
     location => {
       r.findFirstIn(location.input) match {
         case Some(str) => Success(str, str.length)
-        case None =>      Failure(ParserErrors(List(ParserError(location, r.pattern.pattern))))
+        case None =>      Failure(ParserErrors(List(ParserError(location, r.pattern.pattern))), false)
       }
     }
   ) //primitive: Recognizes a regular expression s
@@ -91,7 +83,7 @@ object MyParsers extends Parsers[Parser] {
 
   override def slice[A](p: Parser[A]): Parser[String] = p.copy(location => p.run(location) match {
     case Success(get, charsConsumed) => Success(location.input.take(charsConsumed), charsConsumed)
-    case Failure(get) => Failure(get)
+    case Failure(get, isCommitted) => Failure(get, isCommitted)
   })
 
   override def occurrencesAtLeastOne(c: Char): Parser[SuccessCount] = ???
