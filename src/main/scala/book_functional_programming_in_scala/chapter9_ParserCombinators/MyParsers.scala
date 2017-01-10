@@ -12,45 +12,42 @@ import scala.util.matching.Regex
   * we take the error from the left branch. If in uncommitted state, we take the error from the right branch.
   */
 object MyParsers extends Parsers[Parser] {
-  override def run[A](p: Parser[A])(input: String): Either[ParserErrors, A] = ??? //p.run(input).right.map(_._1)
+  def run[A](p: Parser[A])(input: String): Either[ParserErrors, A] = p.run(Location(0, input)) match {
+    case Success(get, charsConsumed)  => Right(get)
+    case Failure(get, isCommitted)    => Left(get)
+  }
 
-  override def or[A, B >: A](s1: Parser[A], s2: => Parser[B]): Parser[B] =
+  def or[A, B >: A](s1: Parser[A], s2: => Parser[B]): Parser[B] =
     s1.copy(errorLocation => s1.run(errorLocation) match {
-      case Failure(get, false)    =>    s2.run(errorLocation)
+      case Failure(get, false)    => s2.run(errorLocation)
       case r                      => r
     })
 
   def attempt[A](p: Parser[A]): Parser[A] = p.copy(errorLocat => p.run(errorLocat).uncommit)    //converts committed to uncommitted Failure (in case of Failure)
 
-  def flatMap[A, B](p: Parser[A])(f: A => Parser[B]): Parser[B] = ???
-//  {
-//    val outsideErrorOrInsideResult: (String) => Parser[B] =
-//      (input: String) => {
-//        p.run(input) match {
-//          case Left(errors) => p.copy(input => Left(errors))
-//          case Right((a, _)) => f(a)
-//        }
-//      }
-//    flatten(
-//      Parser(input =>
-//        p.run(input).right.map(resultWithInput => (outsideErrorOrInsideResult(input), resultWithInput._2)),
-//        p.committedStatusOfError
-//      )
-//    )
-//  }   //primitive: Runs a parser, and then uses its result to select a second parser to run in sequence
+  def flatMap[A, B](f: Parser[A])(g: A => Parser[B]): Parser[B] = Parser {
+    s => f.run(s) match {
+      case Success(a,n) => {
+        g(a).run(s.advanceBy(n))    //we apply to Parser[B] the input advanced by n charachers, where n is the num of characters that Parser[A] advanced
+          .addCommit(n != 0)        //after running Parser[B], in case of success we change the committed status to true if the input is advanced by at least one char
+          .advanceSuccess(n)        //in case Parser[B] Succeed, we update the parser location on the input
+      }
+      case e@Failure(_,_) => e
+    }
+  }
 
 
 
   implicit def string(s: String): Parser[String] = {
-    def consume(locationInInput: Location)(index: Int, strToMatch: String): Parser.Result[String] = locationInInput match {
-      case KnownLocation(location, input) => {
-        if (strToMatch.isEmpty)    Success(s, s.length)
-        else if(index + location >= input.length || input.charAt(index + location) != strToMatch.head)
-          if(index == 0)  Failure(ParserErrors().push(KnownLocation(index + location, input), s), false)
-          else            Failure(ParserErrors().push(KnownLocation(index + location, input), s), true)
-        else   consume(locationInInput)(index + 1, strToMatch.tail)
-      }
-      case UnknownLocation(input) => Failure(ParserErrors().push(UnknownLocation(input), s), false)
+    def consume(locationInInput: Location)(index: Int, strToMatch: String): Parser.Result[String] =  {
+      val location = locationInInput.location
+      val input = locationInInput.input
+
+      if (strToMatch.isEmpty)    Success(s, s.length)
+      else if(index + location >= input.length || input.charAt(index + location) != strToMatch.head)
+        if(index == 0)  Failure(ParserErrors().push(Location(index + location, input), s), false)
+        else            Failure(ParserErrors().push(Location(index + location, input), s), true)
+      else   consume(locationInInput)(index + 1, strToMatch.tail)
     }
     val parser = Parser {
       location => consume(location)(0, location.input)
@@ -61,7 +58,7 @@ object MyParsers extends Parsers[Parser] {
   def succeed[A](elem: A): Parser[A] = Parser(location => Success(elem, 0))
 
   def failed[A](e: ParserErrorMsg)(p: Parser[A]): Parser[A] = {
-    p.copy(location => Failure(ParserErrors(List(ParserError(UnknownLocation(location.input), e))), false))
+    p.copy(location => Failure(ParserErrors(List(ParserError(Location(location.location, "nothing"), e))), false))
   }//primitive: The resulting Parser always returns Error(e) when run.
 
   implicit def regex(r: Regex): Parser[String] = Parser(

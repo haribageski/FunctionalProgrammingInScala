@@ -3,31 +3,26 @@ package book_functional_programming_in_scala.chapter9_ParserCombinators
 object Errors {
   type ParserErrorMsg = String
 
-  sealed class Location(val input: String)
-
-  case class KnownLocation(location: Int, override val input: String) extends Location(input) {
+  case class Location(location: Int, input: String) {
     require(input.length > location)
     lazy val line = input.slice(0, location + 1).count(_ == '\n') + 1
     lazy val col = input.slice(0,location + 1).lastIndexOf('\n') match {
       case -1 => location + 1
       case lineStart => location - lineStart }
-  }
-  case class UnknownLocation(override val input: String) extends Location(input)
 
+    def advanceBy(n: Int): Location = copy(location = location + n, input)
+  }
 
   case class ParserError(location: Location, expectedInput: String) {
-
-    def errorMessage: ParserErrorMsg = location match {
-      case KnownLocation(location, input) if(expectedInput.length <= location)  =>
-        s"Error: Position $location is bigger than the input."
-      case KnownLocation(l, input)    => s"Error at position $l: Expected ${expectedInput.charAt(l)} but found ${location.input.charAt(l)}."
-      case UnknownLocation(input)     => s"Error: Expected $expectedInput but found ${location.input}."
+    def errorMessage: ParserErrorMsg = {
+       if(expectedInput.length <= location.location)    s"Error: Position $location is bigger than the input."
+       else  s"Error at position ${location.location}: Expected ${expectedInput.charAt(location.location)} but found ${location.input.charAt(location.location)}."
     }
   }
 
   object ParserError {
     def errorsMsgs[A](p: Parser[A]): ParserErrors = ???   //TODO    implicit parsers: Parsers[this.type, Parser]
-    def errorsLocation[A](p: Parser[A]): KnownLocation = ???   //TODO
+    def errorsLocation[A](p: Parser[A]): Location = ???   //TODO
   }
 
   case class ParserErrors(errors: List[ParserError]) {

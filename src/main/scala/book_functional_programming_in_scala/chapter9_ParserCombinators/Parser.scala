@@ -1,7 +1,7 @@
 package book_functional_programming_in_scala.chapter9_ParserCombinators
 
-import book_functional_programming_in_scala.chapter9_ParserCombinators.Errors.{KnownLocation, Location, ParserErrors}
-import book_functional_programming_in_scala.chapter9_ParserCombinators.Parser.{Failure, Result, Success}
+import book_functional_programming_in_scala.chapter9_ParserCombinators.Errors.{Location, ParserErrors}
+import book_functional_programming_in_scala.chapter9_ParserCombinators.Parser.Result
 
 
 case class Parser[+A](run: Location => Result[A])
@@ -16,6 +16,14 @@ object Parser {
     def uncommit: Result[A] = this match {
       case _: Success[A] => this
       case Failure(get, _) =>    Failure(get, false)
+    }
+    def addCommit(isCommitted: Boolean): Result[A] = this match {
+      case Failure(e,c) => Failure(e, c || isCommitted)
+      case _ => this
+    }
+    def advanceSuccess(n: Int): Result[A] = this match {
+      case Success(a, m) => Success(a, n + m)
+      case _ => this
     }
   }
   case class Success[+A](get: A, charsConsumed: Int) extends Result[A]

@@ -135,7 +135,7 @@ trait Parsers[Parser[+ _]] { self =>
             case c => c.toString.toUpperCase
           }) ++ s.substring(location + 1, s.length)
 
-          run(parser)(strWithChangedLetter) == Left(ParserErrors(List(ParserError(KnownLocation(location, strWithChangedLetter), s))))
+          run(parser)(strWithChangedLetter) == Left(ParserErrors(List(ParserError(Location(location, strWithChangedLetter), s))))
         }).sample.run(SimpleRNG(0))._1
       })
 
