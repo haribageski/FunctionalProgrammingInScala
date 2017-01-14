@@ -14,10 +14,7 @@ import scala.util.matching.Regex
 object MyParsers extends Parsers[Parser] {
   def run[A](p: Parser[A])(input: String): Parser.Result[A] = p.run(Location(0, input))
 
-  def run[A](p: Parser[A])(location: Location): Parser.Result[A] = {
-    println("location:" + location)
-    p.run(location)
-  }
+  def run[A](p: Parser[A])(location: Location): Parser.Result[A] = p.run(location)
 
   def or[A, B >: A](s1: Parser[A], s2: => Parser[B]): Parser[B] =
     s1.copy(errorLocation => s1.run(errorLocation) match {

@@ -20,18 +20,16 @@ object JsonParser {
 
 
     def jArrayParser: Parser[JArray] = {
-      regex("""*\[\\s*""".r) skipLeftAndTakeRight
-        (jNullParser | jLiteralParser | jArrayParser | jObjectParser)
-          .takeLeftAndSkipRight(regex("""\\s*\]|,\\s*""".r))
-          .many
-          .map(list => JArray(list.toIndexedSeq))
-          .scope("Failed to parse a JArray.")
+      (char('[') skipLeftAndTakeRight ((attempt(jObjectParser) | attempt(jArrayParser) | attempt(jLiteralParser))
+        takeLeftAndSkipRight attempt(char(',')) | char(']')).many
+        ).map(list => JArray(list.toIndexedSeq))
+        .scope("Failed to parse a JArray.")
     }
 
     def processLine: Parser[(String, JSON)] = {
       whitespace.many skipLeftAndTakeRight stringLiteralWithoutQuotes ** (
         whitespace.many skipLeftAndTakeRight char(':') skipLeftAndTakeRight whitespace.many skipLeftAndTakeRight
-          (attempt(jObjectParser) | attempt(jLiteralParser) | attempt(jArrayParser)) takeLeftAndSkipRight (attempt(char(',')) | char('}')))
+          (attempt(jObjectParser) | attempt(jArrayParser) | attempt(jLiteralParser)) takeLeftAndSkipRight (attempt(char(',')) | char('}')))
     }
 
     def jObjectParser: Parser[JSON] = {
@@ -39,7 +37,7 @@ object JsonParser {
       //      val jObject: Parser[JObject] = ???
       char('{').flatMap { _ =>
         attempt(processLine.many1.map(l => Map(l: _*)).map(JObject(_))) | attempt(jObjectParser) |
-          attempt(jLiteralParser) | attempt(jArrayParser)
+          attempt(jArrayParser) | attempt(jLiteralParser)
       }
     }
 
