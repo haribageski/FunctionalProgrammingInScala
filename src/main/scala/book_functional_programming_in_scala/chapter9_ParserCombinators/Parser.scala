@@ -25,6 +25,16 @@ object Parser {
       case Success(a, m) => Success(a, n + m)
       case _ => this
     }
+    def backwardSuccess(n: Int): Result[A] = this match {
+      case Success(a, m) =>
+        if(m >= n)  Success(a, m - n)
+        else Failure(ParserErrors().push(Location(m, "location backward by " + n), "n <= m"), false)
+      case _ => this
+    }
+    def onFailure[B >: A] (result: Result[B]) = this match {
+      case f: Failure => result
+      case _ => this
+    }
   }
   case class Success[+A](get: A, charsConsumed: Int) extends Result[A]
   case class Failure(get: ParserErrors, isCommitted: Boolean) extends Result[Nothing]

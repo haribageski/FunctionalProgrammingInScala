@@ -39,6 +39,12 @@ object Gen {
 
   def int: Gen[Int] = Gen(Generator.int)
 
+  def char: Gen[Char] = choose(32, 123).map(_.toChar)
+
+  def string(size: Int): Gen[String] =  choose(1, size).flatMap { i =>
+    listOfN(i, char).map(_.mkString)
+  }
+
   def genOption[A](gen: Gen[A]) = ???
 
   def listOfN[A](n: Int, g: Gen[A]): Gen[List[A]] = {

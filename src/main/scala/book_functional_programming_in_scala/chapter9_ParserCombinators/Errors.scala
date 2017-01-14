@@ -4,13 +4,16 @@ object Errors {
   type ParserErrorMsg = String
 
   case class Location(location: Int, input: String) {
-    require(input.length > location)
     lazy val line = input.slice(0, location + 1).count(_ == '\n') + 1
     lazy val col = input.slice(0,location + 1).lastIndexOf('\n') match {
       case -1 => location + 1
       case lineStart => location - lineStart }
 
-    def advanceBy(n: Int): Location = copy(location = location + n, input)
+    def advanceBy(n: Int): Option[Location] = {
+      println("advanceBy" + n)
+      if(location + n > input.length )   None
+      else  Some(copy(location = location + n, input))
+    }
   }
 
   case class ParserError(location: Location, expectedInput: String) {
