@@ -9,6 +9,10 @@ case class Parser[+A](run: Location => Result[A])
 object Parser {
   type InspectedInput = String
   sealed trait Result[+A] {
+    def msg = this match {
+      case Success(get, charsConsumed) => s"Succeed: parsed $get after consuming $charsConsumed characters."
+      case Failure(get, isCommitted)   => s"Failed with committed status - $isCommitted.${get.msg}"
+    }
     def mapError(f: ParserErrors => ParserErrors): Result[A] = this match {
       case Success(get, charsConsumed) => Success(get, charsConsumed)
       case Failure(get, isCommitted) =>    Failure(f(get), isCommitted)

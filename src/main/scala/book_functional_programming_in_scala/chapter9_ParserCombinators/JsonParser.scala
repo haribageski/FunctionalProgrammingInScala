@@ -37,7 +37,7 @@ object JsonParser {
       //      val jObject: Parser[JObject] = ???
       char('{').flatMap { _ =>
         attempt(processLine.many1.map(l => Map(l: _*)).map(JObject(_))) | attempt(jObjectParser) |
-          attempt(jArrayParser) | attempt(jLiteralParser)
+          attempt(jArrayParser).takeLeftAndSkipRight(char('}')) | attempt(jLiteralParser).takeLeftAndSkipRight(char('}'))
       }
     }
 

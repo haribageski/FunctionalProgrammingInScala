@@ -18,8 +18,8 @@ object Errors {
 
   case class ParserError(location: Location, expectedInput: String) {
     def errorMessage: ParserErrorMsg = {
-       if(expectedInput.length <= location.location)    s"Error: Position $location is bigger than the input."
-       else  s"Error at position ${location.location}: Expected ${expectedInput.charAt(location.location)} but found ${location.input.charAt(location.location)}."
+//       if(expectedInput.length <= location.location)    s"Position $location is bigger than the input."
+       s"Expected '$expectedInput' but found '${location.input.charAt(location.location)}'."
     }
   }
 
@@ -29,7 +29,11 @@ object Errors {
   }
 
   case class ParserErrors(errors: List[ParserError]) {
-    def msg = errors.foldLeft("")(_ + '\n' + _.errorMessage)
+    def msg = errors.groupBy(_.location.location).foldLeft("") {
+      case (acc, (location, errorsAtOneLocation)) => acc + '\n' + {
+        s"Error at position $location: ${errorsAtOneLocation.foldLeft("")(_ + "\n\t" + _.errorMessage)}"
+      }
+    }
     def push(loc: Location, expectedInput: String): ParserErrors = copy(errors = ParserError(loc, expectedInput) :: errors)
     def label[A](s: String): ParserErrors = ParserErrors(latestLoc.map(ParserError(_,s)).toList)    //Change the error message of the last message
     def latestLoc: Option[Location] = latest.map(_.location)
