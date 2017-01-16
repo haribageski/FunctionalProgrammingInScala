@@ -56,8 +56,7 @@ object MyParsers extends Parsers[Parser] {
 
       if(strToMatch.isEmpty) Success(s, s.length)
       else if (location >= input.length || input.charAt(location) != strToMatch.head)
-        if (startingLocation != locationInInput) Failure(ParserErrors().push(Location(location, input), strToMatch), false)
-        else Failure(ParserErrors().push(Location(location, input), strToMatch), true)
+        Failure(ParserErrors().push(Location(location, input), strToMatch), startingLocation != locationInInput)
       else {
         consume(locationInInput.copy(location + 1), startingLocation)(strToMatch.tail)
       }
