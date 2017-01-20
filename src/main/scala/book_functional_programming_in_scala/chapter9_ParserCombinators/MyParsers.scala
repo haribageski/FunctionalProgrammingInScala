@@ -2,7 +2,7 @@ package book_functional_programming_in_scala.chapter9_ParserCombinators
 
 import book_functional_programming_in_scala.chapter8_PropertyBasedTesting.Prop._
 import book_functional_programming_in_scala.chapter9_ParserCombinators.Errors._
-import book_functional_programming_in_scala.chapter9_ParserCombinators.Parser.{Failure, Success}
+import book_functional_programming_in_scala.chapter9_ParserCombinators.Parser.{Failure, SliceParsing, Success}
 
 import scala.util.matching.Regex
 
@@ -12,35 +12,47 @@ import scala.util.matching.Regex
   * we take the error from the left branch. If in uncommitted state, we take the error from the right branch.
   */
 object MyParsers extends Parsers[Parser] {
-  def run[A](p: Parser[A])(input: String): Parser.Result[A] = p.run(Location(0, input))
+  def run[A](p: Parser[A])(input: String): Parser.Result[A] = p.run(ParseState(0, input))
 
-  def run[A](p: Parser[A])(location: Location): Parser.Result[A] = p.run(location)
+  def run[A](p: Parser[A])(parseState: ParseState): Parser.Result[A] = p.run(parseState)
 
   def or[A, B >: A](s1: Parser[A], s2: => Parser[B]): Parser[B] =
-    s1.copy(errorLocation => s1.run(errorLocation) match {
-      case Failure(get, false) => s2.run(errorLocation)
+    s1.copy(parseState => s1.run(parseState) match {
+      case Failure(get, false) =>
+        s2.run(parseState).mapError(errors =>
+          (get.isImportant, errors.isImportant) match {
+            case (false ,false)   => ParserErrors(errors.errors , false)
+            case (true ,false)   => ParserErrors(get.errors, true)
+            case (false ,true)   => ParserErrors(errors.errors , true)
+            case (true ,true)   => ParserErrors(errors.errors ::: get.errors, true)
+        })
       case r => r
     })
 
-  def and[A, B >: A](s1: Parser[A], s2: => Parser[B]): Parser[B] =
-    s1.copy(errorLocation => s1.run(errorLocation) match {
-      case Success(a, charsConsumedA) =>
-        s2.run(errorLocation) match {
-          case Success(b, charsConsumedB) =>
-            if (a == b && charsConsumedA == charsConsumedB) Success(b, charsConsumedB)
-            else Failure(ParserErrors().push(Location(charsConsumedB + errorLocation.location, errorLocation.input), "input that gives same results for both parsers"), false)
-          case f => f
-        }
-      case f => f
-    })
+//  def and[A, B >: A](s1: Parser[A], s2: => Parser[B]): Parser[B] =
+//    s1.copy(errorLocation => s1.run(errorLocation) match {
+//      case Success(a, charsConsumedA) =>
+//        s2.run(errorLocation) match {
+//          case Success(b, charsConsumedB) =>
+//            if (a == b && charsConsumedA == charsConsumedB) Success(b, charsConsumedB)
+//            else Failure(ParserErrors().push(ParseState(charsConsumedB + errorLocation.location, errorLocation.input), "input that gives same results for both parsers"), false)
+//          case f => f
+//        }
+//      case f => f
+//    })
 
-  def attempt[A](p: Parser[A]): Parser[A] = p.copy(errorLocat => p.run(errorLocat).uncommit) //converts committed to uncommitted Failure (in case of Failure)
+  def attempt[A](p: Parser[A]): Parser[A] = p.copy(parseState => p.run(parseState).uncommit) //converts committed to uncommitted Failure (in case of Failure)
 
   def flatMap[A, B](f: Parser[A])(g: A => Parser[B]): Parser[B] = Parser {
     //apply input on Parser[A] and then apply input advanced by Parser[A] to Parser[B]
-    s => f.run(s) match {
+    parseState =>
+      val nonParsedState= parseState.isParsed match {
+        case true  => parseState.copy(isParsed = false)
+        case false => parseState
+      }
+      f.run(nonParsedState) match {
       case Success(a, n) => {
-        val updatedLocation: Location = s.copy(s.location + n)
+        val updatedLocation: ParseState = parseState.copy(parseState.location + n)
         g(a).run(updatedLocation) //we apply to Parser[B] the input advanced by n charachers, where n is the num of characters that Parser[A] advanced
               .addCommit(n != 0) //after running Parser[B], in case of success we change the committed status to true if the input is advanced by at least one char
               .advanceSuccess(n) //in case Parser[B] Succeed, we update the parser location on the input
@@ -50,20 +62,22 @@ object MyParsers extends Parsers[Parser] {
   }
 
   implicit def string(s: String): Parser[String] = {
-    def consume(locationInInput: Location, startingLocation: Location)(strToMatch: String): Parser.Result[String] = {
-      val location = locationInInput.location
-      val input = locationInInput.input
+    def consume(parseState: ParseState, startingLocation: ParseState)(strToMatch: String): Parser.Result[String] = {
+      val location = parseState.location
+      val input = parseState.input
 
-      if(strToMatch.isEmpty) Success(s, s.length)
+      if(strToMatch.isEmpty)
+        if(!parseState.isParsed) Success(s, s.length)
+        else SliceParsing(s)
       else if (location >= input.length || input.charAt(location) != strToMatch.head)
-        Failure(ParserErrors().push(Location(location, input), strToMatch), startingLocation != locationInInput)
+        Failure(ParserErrors().push(ParseState(location, input, parseState.isParsed), strToMatch, true), startingLocation != parseState)
       else {
-        consume(locationInInput.copy(location + 1), startingLocation)(strToMatch.tail)
+        consume(parseState.copy(location + 1), startingLocation)(strToMatch.tail)
       }
     }
     Parser {
-      location =>
-        consume(location, location)(s)
+      parseState =>
+        consume(parseState, parseState)(s)
     }
     //    scope(s"Input doesn't start with $s at the specified starting index.")(parser)
   }
@@ -71,34 +85,43 @@ object MyParsers extends Parsers[Parser] {
   def succeed[A](elem: A): Parser[A] = Parser(location => Success(elem, 0))
 
   def failed[A](e: ParserErrorMsg): Parser[A] = Parser(
-    location => Failure(ParserErrors(List(ParserError(Location(location.location, "nothing"), e))), false)
+    parseState => Failure(ParserErrors(List(ParserError(ParseState(parseState.location, "nothing", parseState.isParsed), e, false)), false), false)
   ) //primitive: The resulting Parser always returns Error(e) when run.
 
   implicit def regex(r: Regex): Parser[String] = {
-    Parser(
-      location => {
-        r.findFirstIn(location.input.substring(location.location)) match {
-          case Some(str) =>
-            Success(str, str.length)
-          case None =>
-            Failure(ParserErrors(List(ParserError(location, r.pattern.pattern))), false)
-        }
+    Parser {
+      (parseState: ParseState) => parseState.isParsed match {
+        case true  =>
+          SliceParsing(parseState.input)
+        case false =>
+          r.findFirstIn(parseState.input.substring(parseState.location)) match {
+            case Some(str) =>
+              Success(str, str.length)
+            case None =>
+              Failure(ParserErrors(List(ParserError(parseState, r.pattern.pattern, true)), true), false)
+          }
       }
-    )
+
+
+    }
   } //primitive: Recognizes a regular expression s
 
+
   def scope[A](errorMsg: ParserErrorMsg)(p: Parser[A]): Parser[A] = Parser {
-    location => p.run(location).mapError(_.push(location, errorMsg))
+    parseState => p.run(parseState).mapError(_.push(parseState, errorMsg, true))
   }
 
   def label[A](errorMsg: ParserErrorMsg)(p: Parser[A]): Parser[A] = Parser {
-    location => p.run(location).mapError(_ => ParserErrors().push(location, errorMsg))
+    parseState => p.run(parseState).mapError(_ => ParserErrors().push(parseState, errorMsg, true))
   }
 
-  override def slice[A](p: Parser[A]): Parser[String] = p.copy(location => p.run(location) match {
-    case Success(get, charsConsumed) => Success(location.input.take(charsConsumed), charsConsumed)
-    case Failure(get, isCommitted) => Failure(get, isCommitted)
-  })
+  override def slice[A](p: Parser[A]): Parser[Nothing] = Parser {
+    parseState => p.run(parseState.copy(isParsed = true)) match {
+      case Success(get, charsConsumed) => Failure(ParserErrors().push(parseState, "Expected result SliceParsing but found Success", true), true)
+      case f: Failure   => f
+      case slc: SliceParsing => slc
+    }
+  }
 
   override def occurrencesAtLeastOne(c: Char): Parser[SuccessCount] = ???
   def furthest[A](p: Parser[A]): Parser[A] = ???
@@ -119,24 +142,30 @@ object MyParsers extends Parsers[Parser] {
   def flatten[A](p: Parser[Parser[A]]): Parser[A] = ???
 
   def many[A](p: Parser[A]): Parser[List[A]] = {
-    def iterateRecursively(startingLocation: Location, location: Location, acc: List[A]): Success[List[A]] = {
-      if(location.input.length < location.location)   Success(acc, location.location - startingLocation.location)
-      else  {
-        p.run(location) match {
+    def iterateRecursively(startingParseState: ParseState, parseState: ParseState, acc: List[A]): Parser.Result[List[A]] = {
+      if (parseState.input.length < parseState.location) Success(acc, parseState.location - startingParseState.location)
+      else {
+        p.run(parseState) match {
           case Success(get, charsConsumed) =>
-            val updatedLocation: Location = location.copy(location.location + charsConsumed)
-            iterateRecursively(startingLocation, updatedLocation, get :: acc)
-          case Failure(get, isCommitted) => Success(acc.reverse, location.location - startingLocation.location) //for better performance, we have been prepending elements to the acc, hence, we need to reverse it at the end
+            val updatedState: ParseState = parseState.copy(parseState.location + charsConsumed)
+            iterateRecursively(startingParseState, updatedState, get :: acc)
+          case Failure(get, isCommitted) => parseState.isParsed match {
+            case true => SliceParsing(parseState.input.substring(startingParseState.location, parseState.location))
+            case false => Success(acc.reverse, parseState.location - startingParseState.location) //for better performance, we have been prepending elements to the acc, hence, we need to reverse it at the end
+          }
+          case SliceParsing(inputConsumed) =>
+            val updatedState: ParseState = parseState.copy(parseState.location + inputConsumed.length)
+            iterateRecursively(startingParseState, updatedState, acc)
         }
       }
     }
     Parser(location =>
-      if(location.input.length < location.location)   Success(List.empty[A], 0)
-      else    iterateRecursively(location, location, Nil))
+      if (location.input.length < location.location) Success(List.empty[A], 0)
+      else iterateRecursively(location, location, Nil))
   }
 
   def until[A, B](p: Parser[A], until: Parser[B]): Parser[List[A]] = {
-    def iterateRecursively(startingLocation: Location, currentLocation: Location, acc: List[A]): Success[List[A]] = {
+    def iterateRecursively(startingLocation: ParseState, currentLocation: ParseState, acc: List[A]): Success[List[A]] = {
       if(currentLocation.input.length < currentLocation.location)   Success(acc, currentLocation.location - startingLocation.location)
       else {
         until.run(currentLocation) match {
@@ -145,7 +174,7 @@ object MyParsers extends Parsers[Parser] {
           case _ =>
             p.run(currentLocation) match {
               case Success(get, charsConsumed) =>
-                val updatedLocation: Location = currentLocation.copy(currentLocation.location + charsConsumed)
+                val updatedLocation: ParseState = currentLocation.copy(currentLocation.location + charsConsumed)
                 iterateRecursively(startingLocation, updatedLocation, get :: acc)
               case Failure(get, isCommitted) => Success(acc.reverse, currentLocation.location - startingLocation.location) //done, for better performance, we have been prepending elements to the acc, hence, we need to reverse it at the end
             }

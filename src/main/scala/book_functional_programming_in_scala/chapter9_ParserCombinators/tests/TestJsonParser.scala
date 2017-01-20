@@ -2,7 +2,7 @@ package book_functional_programming_in_scala.chapter9_ParserCombinators.tests
 
 import book_functional_programming_in_scala.chapter6_PurelyFunctionalState.SimpleRNG
 import book_functional_programming_in_scala.chapter8_PropertyBasedTesting.Gen
-import book_functional_programming_in_scala.chapter9_ParserCombinators.Errors.Location
+import book_functional_programming_in_scala.chapter9_ParserCombinators.Errors.ParseState
 import book_functional_programming_in_scala.chapter9_ParserCombinators.{JSON, JsonParser, MyParsers, Parser}
 import book_functional_programming_in_scala.chapter9_ParserCombinators.MyParsers._
 
@@ -50,10 +50,14 @@ object TestJsonParser extends App{
 //  )
 //  ----------------------------------------------
 
-  lazy val jsonParser: Parser[JSON] = JsonParser.jsonParser(MyParsers)
-  lazy val json1 = jsonParser.run(Location(0,
-    """{"1" : 1,"2" : {"3" : true}}"""))
+//  println(string("fae").many.slice.run(ParseState(0, "xyzgr" * 1000000)))
 
-  println(json1)
+  lazy val jsonParser: Parser[JSON] = JsonParser.jsonParser(MyParsers)
+  lazy val json1 = jsonParser.run(ParseState(0,
+    """{"2" : [3,4,5, "a" : {"b" : 1.1}}"""))
+    .msg
+
+
+  println((failed("") | char('b')).run(ParseState(0, "c")).msg)
 
 }

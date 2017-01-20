@@ -21,7 +21,7 @@ object JsonParser {
 
     def jArrayParser: Parser[JArray] = {
       (char('[') skipLeftAndTakeRight ((attempt(jObjectParser) | attempt(jArrayParser) | attempt(jLiteralParser))
-        takeLeftAndSkipRight attempt(char(',')) | char(']')).many
+        takeLeftAndSkipRight attempt(char(',')) | char(']')).many1
         ).map(list => JArray(list.toIndexedSeq))
         .scope("Failed to parse a JArray.")
     }

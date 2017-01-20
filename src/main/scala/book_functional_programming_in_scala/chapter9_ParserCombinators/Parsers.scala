@@ -20,7 +20,7 @@ trait Parsers[Parser[+ _]] { self =>
 
   //representation
   def or[A, B >: A](s1: Parser[A], s2: => Parser[B]): Parser[B]
-  def and[A, B >: A](s1: Parser[A], s2: => Parser[B]): Parser[B]
+//  def and[A, B >: A](s1: Parser[A], s2: => Parser[B]): Parser[B]
   //primitive
   def map[A, B](p: Parser[A])(f: A => B): Parser[B] = p.flatMap(a => succeed(f(a)))
   def product[A, B](p1: Parser[A], p2: => Parser[B]): Parser[(A, B)] = p1.flatMap(a => p2.map((a, _)))
@@ -104,7 +104,7 @@ trait Parsers[Parser[+ _]] { self =>
   case class ParserOps[A](p: Parser[A]) {
     def run(input: String): Result[A] = self.run(p)(input)
     def |[B >: A](p2: => Parser[B]): Parser[B] = self.or(p, p2)
-    def &[B >: A](p2: => Parser[B]): Parser[B] = self.and(p, p2)
+//    def &[B >: A](p2: => Parser[B]): Parser[B] = self.and(p, p2)
     def or[B >: A](p2: => Parser[B]): Parser[B] = self.or(p, p2)
     def map[B](f: A => B): Parser[B] = self.map(p)(f)
     def map2[B, C](p2: Parser[B])(f: (A, B) => C): Parser[C] = self.map2(p, p2)(f)
@@ -173,7 +173,7 @@ trait Parsers[Parser[+ _]] { self =>
             else ""
           }
 
-          run(parser)(strWithChangedLetter) == Left(ParserErrors(List(ParserError(Location(location, strWithChangedLetter), s))))
+          run(parser)(strWithChangedLetter) == Left(ParserErrors(List(ParserError(ParseState(location, strWithChangedLetter), s, true)), true))
         }).sample.run(SimpleRNG(0))._1
       })
 

@@ -1,10 +1,10 @@
 package book_functional_programming_in_scala.chapter9_ParserCombinators
 
-import book_functional_programming_in_scala.chapter9_ParserCombinators.Errors.{Location, ParserErrors}
+import book_functional_programming_in_scala.chapter9_ParserCombinators.Errors.{ParseState, ParserErrors}
 import book_functional_programming_in_scala.chapter9_ParserCombinators.Parser.Result
 
 
-case class Parser[+A](run: Location => Result[A])
+case class Parser[+A](run: ParseState => Result[A])
 
 object Parser {
   type InspectedInput = String
@@ -32,7 +32,7 @@ object Parser {
     def backwardSuccess(n: Int): Result[A] = this match {
       case Success(a, m) =>
         if(m >= n)  Success(a, m - n)
-        else Failure(ParserErrors().push(Location(m, "location backward by " + n), "n <= m"), false)
+        else Failure(ParserErrors().push(ParseState(m, "location backward by " + n), "n <= m", true), false)
       case _ => this
     }
     def onFailure[B >: A] (result: Result[B]) = this match {
@@ -42,5 +42,5 @@ object Parser {
   }
   case class Success[+A](get: A, charsConsumed: Int) extends Result[A]
   case class Failure(get: ParserErrors, isCommitted: Boolean) extends Result[Nothing]
-
+  case class SliceParsing(inputConsumed: String) extends Result[Nothing]
 }
